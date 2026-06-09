@@ -1,0 +1,142 @@
+<!doctype html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1">
+
+<title>Jastiper</title>
+
+<link
+    href="/tabler/dist/css/tabler.min.css"
+    rel="stylesheet">
+
+
+</head>
+
+<body>
+
+<div class="page">
+
+<aside
+    class="navbar navbar-vertical navbar-expand-lg">
+
+    <div class="container-fluid">
+
+        <!-- Mobile Toggle -->
+
+        <button
+            class="navbar-toggler"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#sidebar-menu">
+
+            <span class="navbar-toggler-icon"></span>
+
+        </button>
+
+        <!-- Logo -->
+
+        <h1 class="navbar-brand navbar-brand-autodark">
+
+            Jastiper
+
+        </h1>
+
+        <!-- Menu -->
+
+        <div
+            class="collapse navbar-collapse"
+            id="sidebar-menu">
+
+            <ul class="navbar-nav pt-lg-3">
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       href="/">
+                        Dashboard
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       href="/whatsapp">
+                        WhatsApp
+                    </a>
+                </li>
+
+               <li class="nav-item">
+
+                    <a
+                        class="nav-link"
+                        href="/orders">
+
+                        <span class="nav-link-title">
+
+                            Orders
+
+                        </span>
+
+                    </a>
+
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       href="/invoices">
+                        Invoices
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       href="/customers">
+                        Customers
+                    </a>
+                </li>
+
+            </ul>
+
+        </div>
+
+    </div>
+
+</aside>
+
+<div class="page-wrapper">
+
+    <header
+        class="navbar navbar-expand-md d-print-none">
+
+        <div class="container-xl">
+
+            <h2 class="page-title">
+                Dashboard
+            </h2>
+
+        </div>
+
+    </header>
+
+    <div class="page-body">
+
+        <div class="container-xl">
+
+            <%- body %>
+
+        </div>
+
+    </div>
+
+</div>
+
+</div>
+
+<script src="/tabler/dist/js/tabler.min.js"></script>
+
+</body>
+</html>

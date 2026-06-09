@@ -1,0 +1,154 @@
+<div class="container-xl">
+
+<div class="page-header mb-3">
+
+    <h2>
+        Orders
+    </h2>
+
+</div>
+
+<div class="card">
+
+    <div class="table-responsive">
+
+        <table class="table table-vcenter">
+
+            <thead>
+
+                <tr>
+
+                    <th>Tanggal</th>
+
+                    <th>Nama</th>
+
+                    <th>No HP</th>
+
+                    <th>Produk</th>
+
+                    <th>Harga</th>
+
+                    <th>Qty</th>
+
+                    <th>Subtotal</th>
+
+                    <th>Status</th>
+
+                    <th>Foto</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                <% if(orders.length === 0){ %>
+
+                    <tr>
+
+                        <td colspan="9" class="text-center">
+
+                            Belum ada order
+
+                        </td>
+
+                    </tr>
+
+                <% } %>
+
+                <% orders.forEach(order => { %>
+
+                    <tr>
+
+                        <td>
+                            <%= order.tanggal %>
+                        </td>
+
+                        <td>
+                            <strong>
+                                <%= order.nama %>
+                            </strong>
+                        </td>
+
+                        <td>
+                            <%= order.nohp %>
+                        </td>
+
+                        <td>
+                            <%= order.produk %>
+                        </td>
+
+                        <td>
+                            Rp <%= Number(order.harga).toLocaleString('id-ID') %>
+                        </td>
+
+                        <td>
+                            <%= order.qty %>
+                        </td>
+
+                        <td>
+                            <strong>
+                                Rp <%= Number(order.subtotal).toLocaleString('id-ID') %>
+                            </strong>
+                        </td>
+
+                        <td>
+
+                            <% if(order.status === 'draft'){ %>
+
+                                <span class="badge bg-yellow">
+                                    Draft
+                                </span>
+
+                            <% } else if(order.status === 'approved'){ %>
+
+                                <span class="badge bg-green">
+                                    Approved
+                                </span>
+
+                            <% } else { %>
+
+                                <span class="badge bg-secondary">
+                                    <%= order.status %>
+                                </span>
+
+                            <% } %>
+
+                        </td>
+
+                        <td>
+
+                            <% if(order.photo_path){ %>
+
+                                <a
+                                    href="<%= order.photo_path %>"
+                                    target="_blank">
+
+                                    <img
+                                        src="<%= order.photo_path %>"
+                                        width="70"
+                                        class="rounded border">
+
+                                </a>
+
+                            <% } else { %>
+
+                                -
+
+                            <% } %>
+
+                        </td>
+
+                    </tr>
+
+                <% }) %>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+</div>
