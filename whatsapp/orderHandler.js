@@ -18,10 +18,15 @@ async function saveOrder(data) {
             status,
             customer_msg_id,
             image_msg_id,
+            direct_path,
+            media_key,
+            image_data,
+            photo_path
+
         )
         VALUES
         (
-            ?,?,?,?,?,?,?,?,?,?,?
+            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
         )
         `,
         [
@@ -35,24 +40,31 @@ async function saveOrder(data) {
             data.pesan,
             "draft",
             data.customerMsgID,
-            data.imageMsgID
+            data.imageMsgID,
+            data.directPath,
+            data.mediaKey,
+            data.imageData,
+            data.photoPath
         ]
     );
 
 }
 
 async function approveOrder(
-    customerMsgID
+    customerMsgID,
+    photoPath
 ) {
 
     const [result] =
     await pool.query(
         `
         UPDATE orders
-        SET status='approved'
+        SET status='approved',
+        photo_path=?
         WHERE customer_msg_id=?
         `,
         [
+            photoPath,
             customerMsgID
         ]
     );
@@ -60,7 +72,49 @@ async function approveOrder(
 
 }
 
+async function getOrderByCustomerMsgID(
+    customerMsgID
+) {
+
+    const [rows] =
+        await pool.query(
+            `
+            SELECT *
+            FROM orders
+            WHERE customer_msg_id = ?
+            LIMIT 1
+            `,
+            [customerMsgID]
+        );
+
+    return rows[0];
+
+}
+
+async function orderExists(
+    customerMsgID
+) {
+
+    const [rows] =
+        await pool.query(
+            `
+            SELECT id
+            FROM orders
+            WHERE customer_msg_id = ?
+            LIMIT 1
+            `,
+            [customerMsgID]
+        );
+
+    return rows.length > 0;
+
+}
+
+
+
 module.exports = {
     saveOrder,
-    approveOrder
+    approveOrder,
+    getOrderByCustomerMsgID,
+    orderExists
 };

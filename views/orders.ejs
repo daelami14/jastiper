@@ -11,12 +11,29 @@
 <div class="card">
 
     <div class="table-responsive">
+        <div class="card-header">
+
+            <button
+                type="button"
+                id="btnGenerateInvoice"
+                class="btn btn-primary">
+
+                Generate Invoice
+
+            </button>
+
+        </div>
 
         <table class="table table-vcenter">
 
             <thead>
 
                 <tr>
+                     <th>
+                        <input
+                            type="checkbox"
+                            id="checkAll">
+                    </th>
 
                     <th>Tanggal</th>
 
@@ -59,6 +76,14 @@
                 <% orders.forEach(order => { %>
 
                     <tr>
+                        <td>
+
+                            <input
+                                type="checkbox"
+                                class="customer-checkbox"
+                                value="<%= order.nohp %>">
+
+                        </td>
 
                         <td>
                             <%= order.tanggal %>
@@ -120,16 +145,10 @@
 
                             <% if(order.photo_path){ %>
 
-                                <a
-                                    href="<%= order.photo_path %>"
-                                    target="_blank">
-
-                                    <img
-                                        src="<%= order.photo_path %>"
-                                        width="70"
-                                        class="rounded border">
-
-                                </a>
+                                <img
+                                    src="<%= order.photo_path %>"
+                                    width="80"
+                                    class="img-thumbnail">
 
                             <% } else { %>
 
@@ -152,3 +171,173 @@
 </div>
 
 </div>
+
+<script>
+
+document
+    .getElementById(
+        "checkAll"
+    )
+    .addEventListener(
+        "change",
+        function () {
+
+            document
+                .querySelectorAll(
+                    ".order-checkbox"
+                )
+                .forEach(
+                    cb => {
+
+                        cb.checked =
+                            this.checked;
+
+                    }
+                );
+
+        }
+    );
+
+
+// document
+//     .getElementById(
+//         "btnGenerateInvoice"
+//     )
+//     .addEventListener(
+//         "click",
+//         async () => {
+
+//             const ids =
+//                 Array.from(
+//                     document.querySelectorAll(
+//                         ".order-checkbox:checked"
+//                     )
+//                 )
+//                 .map(
+//                     x => x.value
+//                 );
+
+//             if (
+//                 ids.length === 0
+//             ) {
+
+//                 alert(
+//                     "Pilih order terlebih dahulu"
+//                 );
+
+//                 return;
+
+//             }
+
+//             const res =
+//                 await fetch(
+//                     "/generate-invoice",
+//                     {
+//                         method: "POST",
+
+//                         headers: {
+//                             "Content-Type":
+//                                 "application/json"
+//                         },
+
+//                         body:
+//                             JSON.stringify({
+//                                 nohps
+//                             })
+//                     }
+//                 );
+
+//             const result =
+//                 await res.json();
+
+//             alert(
+//                 result.message
+//             );
+
+//             location.reload();
+
+//         }
+//     );
+
+
+document
+.getElementById(
+    "btnGenerateInvoice"
+)
+.addEventListener(
+    "click",
+    async () => {
+
+        const nohps =
+            [];
+
+        document
+        .querySelectorAll(
+            ".customer-checkbox:checked"
+        )
+        .forEach(
+            cb => {
+
+                nohps.push(
+                    cb.value
+                );
+
+            }
+        );
+
+        if (
+            nohps.length === 0
+        ) {
+
+            alert(
+                "Pilih customer"
+            );
+
+            return;
+
+        }
+
+        const res =
+            await fetch(
+                "/generate-invoice",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body:
+                        JSON.stringify(
+                            {
+                                nohps
+                            }
+                        )
+
+                }
+            );
+
+        const data =
+            await res.json();
+
+        if (
+            data.success
+        ) {
+
+            alert(
+                "Invoice berhasil dibuat"
+            );
+
+            location.reload();
+
+        }
+
+    }
+);
+
+</script>

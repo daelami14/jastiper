@@ -1,3 +1,6 @@
+const runMigrations =
+    require("./migrations");
+
 const pool =
     require("./db");
 
@@ -60,6 +63,10 @@ async function initDatabase() {
 
                 image_msg_id VARCHAR(255),
 
+                direct_path TEXT,
+                media_key VARCHAR(255),
+                image_data LONGTEXT,
+
 
                 INDEX idx_lid (lid),
 
@@ -71,28 +78,25 @@ async function initDatabase() {
         `);
 
         await pool.query(`
-            CREATE TABLE IF NOT EXISTS invoices (
-
+            CREATE TABLE IF NOT EXISTS invoices
+            (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
 
-                invoice_no VARCHAR(50) UNIQUE,
-
-                lid VARCHAR(100),
+                invoice_no VARCHAR(50) NOT NULL UNIQUE,
 
                 nohp VARCHAR(30),
 
                 nama VARCHAR(255),
 
-                total_qty INT,
+                total_item INT DEFAULT 0,
 
-                grand_total INT,
+                total_qty INT DEFAULT 0,
 
-                status VARCHAR(50)
-                DEFAULT 'pending',
+                grand_total INT DEFAULT 0,
 
-                created_at DATETIME
-                DEFAULT CURRENT_TIMESTAMP
+                status VARCHAR(30) DEFAULT 'unpaid',
 
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
         `);
 
@@ -163,7 +167,8 @@ async function initDatabase() {
 
             )
         `);
-
+            
+        await runMigrations();
         console.log(
             "✅ Tables ready"
         );

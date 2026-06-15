@@ -1,0 +1,147 @@
+<div class="container-xl">
+
+    <div class="page-header mb-3">
+
+        <h2>
+            Invoices
+        </h2>
+
+    </div>
+
+    <div class="card">
+
+        <div class="table-responsive">
+
+            <table
+                class="table table-vcenter">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Invoice</th>
+
+                        <th>Customer</th>
+
+                        <th>No HP</th>
+
+                        <th>Total Item</th>
+
+                        <th>Total Qty</th>
+
+                        <th>Grand Total</th>
+
+                        <th>Status</th>
+
+                        <th>Action</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <% if(invoices.length === 0){ %>
+
+                        <tr>
+
+                            <td
+                                colspan="8"
+                                class="text-center">
+
+                                Belum ada invoice
+
+                            </td>
+
+                        </tr>
+
+                    <% } %>
+
+                    <% invoices.forEach(invoice => { %>
+
+                        <tr>
+
+                            <td>
+
+                                <%= invoice.invoice_no %>
+
+                            </td>
+
+                            <td>
+
+                                <%= invoice.nama %>
+
+                            </td>
+
+                            <td>
+
+                                <%= invoice.nohp %>
+
+                            </td>
+
+                            <td>
+
+                                <%= invoice.total_item %>
+
+                            </td>
+
+                            <td>
+
+                                <%= invoice.total_qty %>
+
+                            </td>
+
+                            <td>
+
+                                Rp
+                                <%= Number(invoice.grand_total).toLocaleString('id-ID') %>
+
+                            </td>
+
+                            <td>
+
+                                <% if(invoice.status === 'unpaid'){ %>
+
+                                    <span class="badge bg-yellow">
+
+                                        Unpaid
+
+                                    </span>
+
+                                <% } else { %>
+
+                                    <span class="badge bg-green">
+
+                                        Paid
+
+                                    </span>
+
+                                <% } %>
+
+                            </td>
+
+                            <td>
+
+                                <a
+                                    href="/invoices/<%= invoice.invoice_no %>"
+                                    class="btn btn-primary btn-sm">
+
+                                    Detail
+
+                                </a>
+
+                            </td>
+
+                        </tr>
+
+                    <% }) %>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>

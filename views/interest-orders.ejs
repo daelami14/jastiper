@@ -1,0 +1,102 @@
+<div class="container-xl">
+
+    <div class="page-header mb-3">
+
+        <h2>
+            Interest Order
+        </h2>
+
+    </div>
+
+    <div class="card">
+
+        <div class="table-responsive">
+
+            <table
+                id="interestTable"
+                class="table table-vcenter">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Foto</th>
+
+                        <th>Produk</th>
+
+                        <th>Total Order</th>
+
+                        <th>Total Qty</th>
+
+                        <th>Action</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <% products.forEach(product => { %>
+
+                        <tr>
+
+                            <td>
+
+                                <% if(product.photo_path){ %>
+
+                                    <img
+                                        src="<%= product.photo_path %>"
+                                        width="60"
+                                        class="img-thumbnail">
+
+                                <% } else { %>
+
+                                    -
+
+                                <% } %>
+
+                            </td>
+
+                            <td>
+
+                                <%= product.produk %>
+
+                            </td>
+
+                            <td>
+
+                                <%= product.total_order %>
+
+                            </td>
+
+                            <td>
+
+                                <%= product.total_qty %>
+
+                            </td>
+
+                            <td>
+
+                                <a
+                                    href="/interest-orders/<%= encodeURIComponent(product.image_msg_id) %>"
+                                    class="btn btn-primary btn-sm">
+
+                                    Detail
+
+                                </a>
+
+                            </td>
+
+                        </tr>
+
+                    <% }) %>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>

@@ -1,0 +1,220 @@
+<div class="container-xl">
+
+    <div class="page-header mb-3">
+
+        <h2>
+
+            <%= product.produk %>
+
+        </h2>
+
+    </div>
+
+    <div class="card mb-3">
+
+        <div class="card-body">
+
+            <% if(product.photo_path){ %>
+
+                <img
+                    src="<%= product.photo_path %>"
+                    width="150"
+                    class="img-thumbnail">
+
+            <% } %>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="table-responsive">
+            <div class="card-header">
+
+                <button
+                    id="btnApprove"
+                    class="btn btn-success">
+
+                    Approve Terpilih
+
+                </button>
+
+            </div>
+
+            <table
+                class="table table-vcenter">
+
+                <thead>
+
+                    <tr>
+                        <th>
+
+                            <input
+                                type="checkbox"
+                                id="checkAll">
+
+                        </th>
+
+                        <th>Nama</th>
+
+                        <th>No HP</th>
+
+                        <th>Qty</th>
+
+                        <th>Pesan</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <% orders.forEach(order => { %>
+
+                        <tr>
+                            <tr>
+
+                            <td>
+
+                                <input
+                                    type="checkbox"
+                                    class="order-checkbox"
+                                    value="<%= order.id %>">
+
+                            </td>
+
+                            <td>
+                                <%= order.nama %>
+                            </td>
+
+                            <td>
+                                <%= order.nohp %>
+                            </td>
+
+                            <td>
+                                <%= order.qty %>
+                            </td>
+
+                            <td>
+                                <%= order.pesan %>
+                            </td>
+
+                        </tr>
+
+                    <% }) %>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+document
+    .getElementById(
+        "checkAll"
+    )
+    .addEventListener(
+        "change",
+        function () {
+
+            document
+                .querySelectorAll(
+                    ".order-checkbox"
+                )
+                .forEach(
+                    cb => {
+
+                        cb.checked =
+                            this.checked;
+
+                    }
+                );
+
+        }
+    );
+
+</script>
+<script>
+
+document
+    .getElementById(
+        "btnApprove"
+    )
+    .addEventListener(
+        "click",
+        async () => {
+
+            const ids =
+                [];
+
+            document
+                .querySelectorAll(
+                    ".order-checkbox:checked"
+                )
+                .forEach(
+                    cb => {
+
+                        ids.push(
+                            cb.value
+                        );
+
+                    }
+                );
+
+            if (
+                ids.length === 0
+            ) {
+
+                alert(
+                    "Pilih order terlebih dahulu"
+                );
+
+                return;
+
+            }
+
+            const res =
+                await fetch(
+                    "/interest-orders/approve",
+                    {
+
+                        method:
+                            "POST",
+
+                        headers: {
+
+                            "Content-Type":
+                                "application/json"
+
+                        },
+
+                        body:
+                            JSON.stringify(
+                                { ids }
+                            )
+
+                    }
+                );
+
+            const data =
+                await res.json();
+
+            if (
+                data.success
+            ) {
+
+                location.reload();
+
+            }
+
+        }
+    );
+
+</script>

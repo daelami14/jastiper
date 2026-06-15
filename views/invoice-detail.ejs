@@ -1,0 +1,186 @@
+<div class="container-xl">
+
+    <div class="page-header mb-3">
+
+        <h2>
+
+            <%= invoice.invoice_no %>
+
+        </h2>
+
+    </div>
+    <div class="mb-3">
+
+        <button
+            id="btnSendInvoice"
+            class="btn btn-success">
+
+            Kirim Invoice WA
+
+        </button>
+
+    </div>
+
+    <div class="card mb-3">
+
+        <div class="card-body">
+
+            <div>
+
+                <strong>Nama :</strong>
+
+                <%= invoice.nama %>
+
+            </div>
+
+            <div>
+
+                <strong>No HP :</strong>
+
+                <%= invoice.nohp %>
+
+            </div>
+
+            <div>
+
+                <strong>Status :</strong>
+
+                <%= invoice.status %>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="table-responsive">
+
+            <table
+                class="table table-vcenter">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Produk</th>
+
+                        <th>Harga</th>
+
+                        <th>Qty</th>
+
+                        <th>Subtotal</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <% items.forEach(item => { %>
+
+                        <tr>
+
+                            <td>
+
+                                <%= item.produk %>
+
+                            </td>
+
+                            <td>
+
+                                Rp
+                                <%= Number(item.harga).toLocaleString('id-ID') %>
+
+                            </td>
+
+                            <td>
+
+                                <%= item.qty %>
+
+                            </td>
+
+                            <td>
+
+                                Rp
+                                <%= Number(item.subtotal).toLocaleString('id-ID') %>
+
+                            </td>
+
+                        </tr>
+
+                    <% }) %>
+
+                </tbody>
+
+                <tfoot>
+
+                    <tr>
+
+                        <th colspan="3">
+
+                            Grand Total
+
+                        </th>
+
+                        <th>
+
+                            Rp
+                            <%= Number(invoice.grand_total).toLocaleString('id-ID') %>
+
+                        </th>
+
+                    </tr>
+
+                </tfoot>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+document
+.getElementById(
+    "btnSendInvoice"
+)
+.addEventListener(
+    "click",
+    async () => {
+
+        const res =
+            await fetch(
+                "/invoices/send/<%= invoice.invoice_no %>",
+                {
+                    method: "POST"
+                }
+            );
+
+        const data =
+            await res.json();
+
+        if (
+            data.success
+        ) {
+
+            alert(
+                "Invoice berhasil dikirim"
+            );
+
+        } else {
+
+            alert(
+                "Gagal kirim invoice"
+            );
+
+        }
+
+    }
+);
+
+</script>

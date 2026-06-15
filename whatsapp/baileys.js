@@ -5,11 +5,14 @@ const {
     DisconnectReason
 } = require("@whiskeysockets/baileys");
 
+
 const P = require("pino");
 
 const {
     saveOrder,
-    approveOrder
+    approveOrder,   
+    getOrderByCustomerMsgID,
+    orderExists
 } = require("./orderHandler");
 
 const fs =
@@ -24,15 +27,26 @@ const {
 
 const state = require("./state");
 
+const {
+    setSocket
+} = require(
+    "./socketStore"
+);
+
 const ALLOWED_GROUPS = [
 
-    "120363403061057636@g.us"
+    "120363403061057636@g.us",
+    "120363212854284513@g.us"
 
 ];
 
 const ADMINS = [
 
-    "6281808385596@s.whatsapp.net"
+    "6281808385596@s.whatsapp.net",
+    "222591159693354@s.whatsapp.net", //audi
+    "274006129287259@s.whatsapp.net", //gw
+    "222591159693354@lid"
+
 
 ];
 
@@ -67,6 +81,7 @@ async function startWhatsApp() {
             })
 
         });
+        setSocket(sock);
 
         sock.ev.on(
             "creds.update",
@@ -107,6 +122,108 @@ async function startWhatsApp() {
                         ext?.contextInfo?.quotedMessage?.imageMessage
                     ) {
 
+                        const imageMessage =
+                        ext.contextInfo
+                            .quotedMessage
+                            .imageMessage;
+
+                        const quotedSender =
+                            ext.contextInfo.participantAlt ||
+                            ext.contextInfo.participant;
+
+                        console.log(
+                            "Quoted Sender:",
+                            quotedSender
+                        );
+
+                        if (
+                            !ADMINS.includes(
+                                quotedSender
+                            )
+                        ) {
+
+                            console.log(
+                                "⛔ Bukan gambar admin"
+                            );
+
+                            return;
+
+                        }
+
+                        const imageData =
+                            JSON.stringify(
+                                imageMessage
+                            );
+                        console.log(
+                            "Image loaded from DB"
+                        );
+
+                        const imageMsgID =
+                            ext.contextInfo
+                                .stanzaId;
+
+                        const fileName =
+                            `product_${imageMsgID}.jpg`;
+
+                        const photoPath =
+                            `/uploads/${fileName}`;
+
+                        const savePath =
+                            path.join(
+                                __dirname,
+                                "../public/uploads",
+                                fileName
+                            );
+
+                        if (
+                            !fs.existsSync(
+                                savePath
+                            )
+                        ) {
+
+                            console.log(
+                                "📥 Download foto produk..."
+                            );
+
+                        }
+                        const buffer =
+                                await downloadMediaMessage(
+                                    {
+                                        message: {
+                                            imageMessage
+                                        }
+                                    },
+                                    "buffer",
+                                    {},
+                                    {
+                                        logger: P({
+                                            level: "silent"
+                                        }),
+                                        reuploadRequest:
+                                            sock.updateMediaMessage
+                                    }
+                                );
+
+                            fs.writeFileSync(
+                                savePath,
+                                buffer
+                            );
+
+                            console.log(
+                                "✅ Foto produk disimpan:",
+                                savePath
+                            );
+
+                       
+
+                        const directPath =
+                            imageMessage.directPath;
+
+                        const mediaKey =
+                            Buffer
+                                .from(imageMessage.mediaKey)
+                                .toString("base64");
+
                         const caption =
                             ext.contextInfo
                                 .quotedMessage
@@ -121,19 +238,43 @@ async function startWhatsApp() {
 
                         let harga = 0;
 
-                        const hargaMatch =
-                            caption.match(
-                                /(\d+)\s*k/i
-                            );
+                        const hargaText =
+                            lines[1]
+                                ?.toLowerCase()
+                                .replace(/k/g, "")
+                                .replace(/\s+/g, "")
+                                || "";
 
-                        if (hargaMatch) {
+                        if (
+                            hargaText.includes("+")
+                        ) {
 
-                            harga =
-                                parseInt(
-                                    hargaMatch[1]
-                                ) * 1000;
+                            const parts =
+                                hargaText.split("+");
 
-                        }
+                                    harga =
+                                        parts.reduce(
+                                            (sum, item) =>
+                                                sum + parseInt(item || 0),
+                                            0
+                                        ) * 1000;
+
+                                }
+                                else {
+
+                                    harga =
+                                        parseInt(
+                                            hargaText || 0
+                                        ) * 1000;
+
+                                }
+
+                                console.log(
+                                    "Produk:",
+                                    produk,
+                                    "Harga:",
+                                    harga
+                                );
 
                         let qty = 1;
 
@@ -163,6 +304,39 @@ async function startWhatsApp() {
                                     "@s.whatsapp.net",
                                     ""
                                 );
+                        const exists =
+                            await orderExists(
+                                msg.key.id
+                            );
+
+                        if (exists) {
+
+                            console.log(
+                                "⚠️ Order sudah ada"
+                            );
+
+                            return;
+
+                        }
+                        const customerText =
+                            (ext.text || "")
+                                .toLowerCase()
+                                .trim();
+
+                        const isOrder =
+                        /\bmau\b/i.test(
+                            customerText
+                        );
+
+                        if (!isOrder) {
+
+                            console.log(
+                                "⛔ Bukan order"
+                            );
+
+                            return;
+
+                        }
 
                         await saveOrder({
 
@@ -190,7 +364,13 @@ async function startWhatsApp() {
 
                             imageMsgID:
                                 ext.contextInfo
-                                    .stanzaId
+                                    .stanzaId,
+                            directPath,
+
+                            mediaKey,
+
+                            imageData,
+                            photoPath
 
                         });
 
@@ -221,6 +401,24 @@ async function startWhatsApp() {
                     const reaction =
                         reactions[0];
 
+                     const groupId =
+                            reaction.key.remoteJid;
+
+                        if (
+                            !ALLOWED_GROUPS.includes(
+                                groupId
+                            )
+                        ) {
+
+                            // console.log(
+                            //     "⛔ Group tidak diizinkan:",
+                            //     groupId
+                            // );
+
+                            return;
+
+                        }
+
                     if (!reaction)
                         return;
                     console.dir(
@@ -243,20 +441,92 @@ async function startWhatsApp() {
                         sender
                     );
 
-                    if (
-                        !ADMINS.includes(sender)
-                    ) {
+                    // if (
+                    //     !ADMINS.includes(sender)
+                    // ) {
+
+                    //     console.log(
+                    //         "⛔ Bukan admin"
+                    //     );
+
+                    //     return;
+
+                    // }
+
+                    const customerMsgID =
+                        reaction.key.id;
+
+                    const order =
+                        await getOrderByCustomerMsgID(
+                            customerMsgID
+                        );
+
+                    if (!order) {
 
                         console.log(
-                            "⛔ Bukan admin"
+                            "Order tidak ditemukan"
                         );
 
                         return;
 
                     }
+                    console.log(
+                        "Order ditemukan:",
+                        order.id
+                    );  
+                    const imageMessage =
+                    JSON.parse(
+                        order.image_data
+                    );
 
-                    const customerMsgID =
-                        reaction.key.id;
+                    const fileName =
+                        `order_${order.id}.jpg`;
+
+                    const savePath =
+                        path.join(
+                            __dirname,
+                            "../public/uploads",
+                            fileName
+                        );
+                    console.log(
+                        "Image data loaded"
+                    );
+                    const buffer =
+                    await downloadMediaMessage(
+                        {
+                            message: {
+                                imageMessage
+                            }
+                        },
+                        "buffer",
+                        {},
+                        {
+                            logger: P({
+                                level: "silent"
+                            }),
+                            reuploadRequest:
+                                sock.updateMediaMessage
+                        }
+                    );
+
+                    console.log(
+                        "Buffer size:",
+                        buffer.length
+                    );
+                    fs.writeFileSync(
+                        savePath,
+                        buffer
+                    );
+
+                    console.log(
+                        "📸 Foto tersimpan:",
+                        savePath
+                    );
+
+                    console.dir(
+                        imageMessage,
+                        { depth: null }
+                    );
 
                     console.log(
                         "✅ APPROVED:",
@@ -320,19 +590,19 @@ async function startWhatsApp() {
                     const groups =
                         await sock.groupFetchAllParticipating();
 
-                    console.log(
-                        "\n===== GROUP LIST =====\n"
-                    );
+                    // console.log(
+                    //     "\n===== GROUP LIST =====\n"
+                    // );
 
-                    Object.values(groups).forEach(
-                        group => {
+                    // Object.values(groups).forEach(
+                    //     group => {
 
-                            console.log(
-                                `${group.subject} => ${group.id}`
-                            );
+                    //         console.log(
+                    //             `${group.subject} => ${group.id}`
+                    //         );
 
-                        }
-                    );
+                    //     }
+                    // );
 
                 }
 
