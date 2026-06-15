@@ -11,15 +11,52 @@
     </div>
     <div class="mb-3">
 
+            <% if(invoice.wa_sent == 0){ %>
+
+            <button
+                id="btnSendInvoice"
+                class="btn btn-success">
+
+                Kirim Invoice WA
+
+            </button>
+
+            <% } %>
+
         <button
-            id="btnSendInvoice"
+            id="btnMarkPaid"
             class="btn btn-success">
 
-            Kirim Invoice WA
+            Mark Paid
 
         </button>
 
+        <div>
+
+            <strong>WA Sent :</strong>
+
+            <% if(invoice.wa_sent == 1){ %>
+
+                <span class="badge bg-green">
+
+                    Sent
+
+                </span>
+
+            <% } else { %>
+
+                <span class="badge bg-red">
+
+                    Not Sent
+
+                </span>
+
+            <% } %>
+
+        </div>
+
     </div>
+    
 
     <div class="card mb-3">
 
@@ -182,5 +219,50 @@ document
 
     }
 );
+
+document
+.getElementById(
+    "btnMarkPaid"
+)
+.addEventListener(
+    "click",
+    async () => {
+
+        if(
+            !confirm(
+                "Tandai invoice sebagai PAID ?"
+            )
+        ) {
+
+            return;
+
+        }
+
+        const res =
+            await fetch(
+                "/invoices/paid/<%= invoice.invoice_no %>",
+                {
+                    method: "POST"
+                }
+            );
+
+        const data =
+            await res.json();
+
+        if (
+            data.success
+        ) {
+
+            alert(
+                "Invoice berhasil dibayar"
+            );
+
+            location.reload();
+
+        }
+
+    }
+);
+
 
 </script>

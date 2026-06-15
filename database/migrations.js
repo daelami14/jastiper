@@ -68,6 +68,11 @@ async function runMigrations() {
             "image_data",
             "LONGTEXT"
         );
+        await addColumnIfNotExists(
+            "invoices",
+            "wa_sent",
+            "TINYINT(1) DEFAULT 0"
+        );
 
         console.log(
             "✅ Migration selesai"

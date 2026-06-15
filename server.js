@@ -115,25 +115,89 @@ app.use(
 | ROUTES
 |--------------------------------------------------------------------------
 */
-
+// Dashboard
 app.get(
     "/",
-    (req, res) => {
+    async (req, res) => {
+
+        const pool =
+            require("./database/db");
+
+        const [[totalOrders]] =
+            await pool.query(
+                `
+                SELECT COUNT(*) total
+                FROM orders
+                WHERE status='approved'
+                `
+            );
+
+        const [[totalCustomers]] =
+            await pool.query(
+                `
+                SELECT COUNT(
+                    DISTINCT nohp
+                ) total
+                FROM orders
+                `
+            );
+
+        const [[pendingInvoices]] =
+            await pool.query(
+                `
+                SELECT COUNT(*) total
+                FROM invoices
+                WHERE status='unpaid'
+                `
+            );
+
+        const [[totalInvoices]] =
+            await pool.query(
+                `
+                SELECT COUNT(*) total
+                FROM invoices
+                `
+            );
+
+        const [[revenue]] =
+            await pool.query(
+                `
+                SELECT
+                    COALESCE(
+                        SUM(grand_total),
+                        0
+                    ) total
+                FROM invoices
+                WHERE status='paid'
+                `
+            );
 
         res.render(
             "dashboard",
             {
-                totalOrders: 0,
-                totalCustomers: 0,
-                pendingInvoices: 0,
-                totalInvoices: 0,
-                revenue: 0
+
+                totalOrders:
+                    totalOrders.total,
+
+                totalCustomers:
+                    totalCustomers.total,
+
+                pendingInvoices:
+                    pendingInvoices.total,
+
+                totalInvoices:
+                    totalInvoices.total,
+
+                revenue:
+                    revenue.total
+
             }
         );
 
     }
 );
 
+// Interest Orders
 app.get(
     "/interest-orders",
     async (req, res) => {
@@ -175,6 +239,7 @@ app.get(
     }
 );
 
+// Interest Order Detail
 app.get(
     "/interest-orders/:imageMsgId",
     async (req, res) => {
@@ -219,6 +284,8 @@ app.get(
 
     }
 );
+
+// Approve Interest Order
 app.post(
     "/interest-orders/approve",
     async (req, res) => {
@@ -305,6 +372,7 @@ Terima kasih 🙏`
     }
 );
 
+// Orders
 app.get(
     "/orders",
     async (req, res) => {
@@ -325,7 +393,7 @@ app.get(
                 subtotal,
                 status,
                 photo_path
-            FROM orders where status != 'draft'
+            FROM orders where status != 'draft' and invoice_no is null or wa_sent = 0
             ORDER BY id DESC;
             `);
 
@@ -339,6 +407,7 @@ app.get(
     }
 );
 
+// Invoices
 app.get(
     "/invoices",
     async (req, res) => {
@@ -362,6 +431,8 @@ app.get(
 
     }
 );
+
+// Invoice Detail
 app.get(
     "/invoices/:invoiceNo",
     async (req, res) => {
@@ -411,6 +482,7 @@ app.get(
     }
 );
 
+// Send Invoice
 app.post(
     "/invoices/send/:invoiceNo",
     async (req, res) => {
@@ -447,6 +519,14 @@ app.post(
                 invoice,
                 items
             );
+            await pool.query(
+                `
+                UPDATE invoices
+                SET wa_sent = 1
+                WHERE invoice_no = ?
+                `,
+                [invoiceNo]
+            );
 
             res.json({
 
@@ -469,6 +549,49 @@ app.post(
     }
 );
 
+// Invoice Paid
+app.post(
+    "/invoices/paid/:invoiceNo",
+    async (req, res) => {
+
+        try {
+
+            const pool =
+                require("./database/db");
+
+            await pool.query(
+                `
+                UPDATE invoices
+                SET status='paid'
+                WHERE invoice_no=?
+                `,
+                [
+                    req.params.invoiceNo
+                ]
+            );
+
+            return res.json({
+
+                success: true
+
+            });
+
+        } catch (err) {
+
+            console.log(err);
+
+            return res.status(500).json({
+
+                success: false
+
+            });
+
+        }
+
+    }
+);
+
+// Generate Invoice
 app.post(
     "/generate-invoice",
     async (req, res) => {
@@ -526,7 +649,7 @@ app.post(
     }
 );
 
-
+// Generate Invoice for Orders
 app.post(
     "/orders/generate-invoice",
     async (req, res) => {
