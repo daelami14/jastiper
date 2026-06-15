@@ -172,9 +172,26 @@ app.get(
                 `
             );
 
+        const [recentInvoices] =
+            await pool.query(
+                `
+                SELECT *
+                FROM invoices
+                ORDER BY id DESC
+                LIMIT 10
+                `
+            );
+
         res.render(
             "dashboard",
             {
+                activePage:
+                    "dashboard",
+                pageTitle:
+                    "Dashboard",
+
+                pageDescription:
+                    "Ringkasan aktivitas jastip",
 
                 totalOrders:
                     totalOrders.total,
@@ -189,7 +206,10 @@ app.get(
                     totalInvoices.total,
 
                 revenue:
-                    revenue.total
+                    revenue.total,
+
+                recentInvoices :
+                    recentInvoices
 
             }
         );
@@ -232,7 +252,16 @@ app.get(
         res.render(
             "interest-orders",
             {
-                products
+                activePage:
+                "interest-orders",
+
+                pageTitle:
+                    "Interest Orders",
+
+                pageDescription:
+                    "Daftar pesanan yang sedang di proses",
+
+                products,
             }
         );
 
@@ -275,6 +304,15 @@ app.get(
         res.render(
             "interest-order-detail",
             {
+                activePage:
+                    "interest-order-detail",
+
+                pageTitle:
+                    "Interest Order Detail",
+
+                pageDescription:
+                    "Detail pesanan yang sedang di proses",
+
                 product:
                     orders[0],
 
@@ -393,13 +431,22 @@ app.get(
                 subtotal,
                 status,
                 photo_path
-            FROM orders where status != 'draft' and invoice_no is null or wa_sent = 0
+            FROM orders where status != 'draft' and invoice_no is null
             ORDER BY id DESC;
             `);
 
         res.render(
             "orders",
             {
+                activePage:
+                    "orders",
+
+                pageTitle:
+                "Orders",
+
+                pageDescription:
+                "Daftar pesanan yang telah diapprove",
+
                 orders
             }
         );
@@ -425,6 +472,15 @@ app.get(
         res.render(
             "invoices",
             {
+                activePage:
+                    "invoices",
+
+                pageTitle:
+                    "Invoices",
+
+                pageDescription:
+                    "Invoice dan status pembayaran",
+
                 invoices
             }
         );
@@ -474,6 +530,15 @@ app.get(
         res.render(
             "invoice-detail",
             {
+                activePage:
+                    "invoice-detail",
+
+                pageTitle:
+                    "Invoice Detail",
+
+                pageDescription:
+                    "Detail invoice dan item",
+
                 invoice,
                 items
             }
@@ -765,6 +830,7 @@ const whatsappState =
         "./whatsapp/state"
     );
 
+ // WhatsApp Status
 app.get(
     "/whatsapp",
     async (req, res) => {
@@ -785,6 +851,14 @@ app.get(
             res.render(
                 "whatsapp",
                 {
+                    activePage:
+                        "whatsapp",
+                    pageTitle:
+                        "WhatsApp",
+
+                    pageDescription:
+                        "Status koneksi WhatsApp",
+
                     status:
                         whatsappState.connected
                             ? "Connected"
@@ -822,11 +896,15 @@ app.get(
     }
 );
 
+// WhatsApp API
+
+
 app.get(
     "/api/whatsapp",
     (req, res) => {
 
         res.json({
+
 
             connected:
                 whatsappState.connected,

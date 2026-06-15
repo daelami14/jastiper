@@ -19,6 +19,12 @@
 </head>
 
 <body>
+    <%
+const current =
+    typeof activePage !== "undefined"
+    ? activePage
+    : "";
+%>
 
 <div class="page">
 
@@ -41,9 +47,33 @@
 
         <!-- Logo -->
 
+        <!-- Logo -->
+
         <h1 class="navbar-brand navbar-brand-autodark">
 
-            Jastiper
+            <div>
+
+                <div
+                    style="
+                        font-size:20px;
+                        font-weight:700;
+                    ">
+
+                    Nitip.MamaZZ
+
+                </div>
+
+                <div
+                    style="
+                        font-size:11px;
+                        color:#999;
+                    ">
+
+                    Admin Panel
+
+                </div>
+
+            </div>
 
         </h1>
 
@@ -56,27 +86,63 @@
             <ul class="navbar-nav pt-lg-3">
 
                 <li class="nav-item">
-                    <a class="nav-link"
-                       href="/">
-                        Dashboard
+
+                    <a
+                        class="nav-link <%= current === 'dashboard' ? 'active' : '' %>"
+                        href="/">
+
+                        <span class="nav-link-icon">
+
+                            📊
+
+                        </span>
+
+                        <span class="nav-link-title">
+
+                            Dashboard
+
+                        </span>
+
                     </a>
+
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link"
-                       href="/whatsapp">
-                        WhatsApp
+
+                    <a
+                        class="nav-link <%= current === 'whatsapp' ? 'active' : '' %>"
+                        href="/whatsapp">
+
+                        <span class="nav-link-icon">
+
+                            📱
+
+                        </span>
+
+                        <span class="nav-link-title">
+
+                            WhatsApp
+
+                        </span>
+
                     </a>
+
                 </li>
                 <li class="nav-item">
 
                     <a
-                        class="nav-link"
+                        class="nav-link <%= current === 'interest-orders' ? 'active' : '' %>"
                         href="/interest-orders">
+
+                        <span class="nav-link-icon">
+
+                            ❤️
+
+                        </span>
 
                         <span class="nav-link-title">
 
-                            Interest Order
+                            Interest Orders
 
                         </span>
 
@@ -87,8 +153,14 @@
                <li class="nav-item">
 
                     <a
-                        class="nav-link"
+                        class="nav-link <%= current === 'orders' ? 'active' : '' %>"
                         href="/orders">
+
+                        <span class="nav-link-icon">
+
+                            🛒
+
+                        </span>
 
                         <span class="nav-link-title">
 
@@ -101,17 +173,47 @@
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link"
-                       href="/invoices">
-                        Invoices
+
+                    <a
+                        class="nav-link <%= current === 'invoices' ? 'active' : '' %>"
+                        href="/invoices">
+
+                        <span class="nav-link-icon">
+
+                            🧾
+
+                        </span>
+
+                        <span class="nav-link-title">
+
+                            Invoices
+
+                        </span>
+
                     </a>
+
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link"
-                       href="/customers">
-                        Customers
+
+                    <a
+                        class="nav-link <%= current === 'customers' ? 'active' : '' %>"
+                        href="/customers">
+
+                        <span class="nav-link-icon">
+
+                            👥
+
+                        </span>
+
+                        <span class="nav-link-title">
+
+                            Customers
+
+                        </span>
+
                     </a>
+
                 </li>
 
             </ul>
@@ -124,18 +226,33 @@
 
 <div class="page-wrapper">
 
-    <header
-        class="navbar navbar-expand-md d-print-none">
+    <header class="navbar navbar-expand-md d-print-none">
 
-        <div class="container-xl">
+    <div class="container-xl">
+
+        <div>
 
             <h2 class="page-title">
-                Dashboard
+
+                <%= pageTitle || "Dashboard" %>
+
             </h2>
+
+            <% if(pageDescription){ %>
+
+                <div class="text-secondary">
+
+                    <%= pageDescription %>
+
+                </div>
+
+            <% } %>
 
         </div>
 
-    </header>
+    </div>
+
+</header>
 
     <div class="page-body">
 
