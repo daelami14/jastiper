@@ -1,28 +1,20 @@
-<div class="container-xl">
+<div class="card">
 
-    <div class="page-header mb-3">
-
-        <h2>
-            Interest Order
-        </h2>
-
-    </div>
-
-    <div class="card">
+    <div class="card-body">
 
         <div class="table-responsive">
 
             <table
                 id="interestTable"
-                class="table table-vcenter">
+                class="table table-striped table-hover">
 
                 <thead>
 
                     <tr>
 
-                        <th>Foto</th>
+                        <th>Image</th>
 
-                        <th>Produk</th>
+                        <th>Product</th>
 
                         <th>Total Order</th>
 
@@ -38,56 +30,53 @@
 
                     <% products.forEach(product => { %>
 
-                        <tr>
+                    <tr>
 
-                            <td>
+                        <td>
 
-                                <% if(product.photo_path){ %>
+                            <% if(product.photo_path){ %>
 
-                                    <img
-                                        src="<%= product.photo_path %>"
-                                        width="60"
-                                        class="img-thumbnail">
+                                <img
+                                    src="<%= product.photo_path %>"
+                                    width="60"
+                                    class="rounded">
 
-                                <% } else { %>
+                            <% } %>
 
-                                    -
+                        </td>
 
-                                <% } %>
+                        <td>
 
-                            </td>
+                            <%= product.produk %>
 
-                            <td>
+                        </td>
 
-                                <%= product.produk %>
-
-                            </td>
-
-                            <td>
+                        <td>
 
                                 <%= product.total_order %>
 
-                            </td>
 
-                            <td>
+                        </td>
 
-                                <%= product.total_qty %>
+                        <td>
 
-                            </td>
+                            <%= product.total_qty %>
 
-                            <td>
+                        </td>
 
-                                <a
-                                    href="/interest-orders/<%= encodeURIComponent(product.image_msg_id) %>"
-                                    class="btn btn-primary btn-sm">
+                        <td>
 
-                                    Detail
+                            <a
+                                href="/interest-orders/<%= encodeURIComponent(product.image_msg_id) %>"
+                                class="btn btn-primary btn-sm">
 
-                                </a>
+                                Detail
 
-                            </td>
+                            </a>
 
-                        </tr>
+                        </td>
+
+                    </tr>
 
                     <% }) %>
 
@@ -100,3 +89,22 @@
     </div>
 
 </div>
+<script>
+
+$(document).ready(function(){
+
+    $('#interestTable').DataTable({
+
+        pageLength: 10,
+
+        order: [
+            [2,'desc']
+        ],
+
+        responsive: true
+
+    });
+
+});
+
+</script>

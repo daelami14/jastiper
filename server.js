@@ -225,29 +225,28 @@ app.get(
         const pool =
             require("./database/db");
 
-        const [products] =
-            await pool.query(`
-                SELECT
-                    image_msg_id,
-                    produk,
-                    photo_path,
+       const [products] =
+        await pool.query(`
+            SELECT
 
-                    COUNT(*) total_order,
+                image_msg_id,
 
-                    SUM(qty) total_qty
+                MAX(produk) produk,
 
-                FROM orders
+                MAX(photo_path) photo_path,
 
-                WHERE status='draft'
+                COUNT(*) total_order,
 
-                GROUP BY
-                    image_msg_id,
-                    produk,
-                    photo_path
+                SUM(qty) total_qty
 
-                ORDER BY
-                    MAX(id) DESC
-            `);
+            FROM orders
+
+            WHERE status='draft'
+
+            GROUP BY image_msg_id
+
+            ORDER BY MAX(created_at) DESC
+        `);
 
         res.render(
             "interest-orders",
@@ -259,7 +258,7 @@ app.get(
                     "Interest Orders",
 
                 pageDescription:
-                    "Daftar pesanan yang sedang di proses",
+                    "Daftar Produk Yang Dicari Customer",
 
                 products,
             }
@@ -291,6 +290,20 @@ app.get(
                 [imageMsgId]
             );
 
+        const [[summary]] =
+            await pool.query(
+                `
+                SELECT
+                    COUNT(*) AS total_customer,
+                    SUM(qty) AS total_qty,
+                    SUM(subtotal) AS total_nominal
+                FROM orders
+                WHERE image_msg_id = ?
+                AND status='draft'
+                `,
+                [imageMsgId]
+            );
+
         if (
             orders.length === 0
         ) {
@@ -311,12 +324,13 @@ app.get(
                     "Interest Order Detail",
 
                 pageDescription:
-                    "Detail pesanan yang sedang di proses",
+                    "Detail Produk Yang Dicari Customer",
 
                 product:
                     orders[0],
 
-                orders
+                orders,
+                summary,
             }
         );
 
@@ -420,19 +434,29 @@ app.get(
 
         const [orders] =
             await pool.query(`
-                SELECT
-                id,
-                DATE_FORMAT(created_at,'%d-%m-%Y %H:%i') AS tanggal,
-                nama,
-                nohp,
-                produk,
-                harga,
-                qty,
-                subtotal,
-                status,
-                photo_path
-            FROM orders where status != 'draft' and invoice_no is null
-            ORDER BY id DESC;
+            SELECT
+
+                lid,
+
+                MAX(nama) nama,
+
+                MAX(nohp) nohp,
+
+                COUNT(*) total_produk,
+
+                SUM(qty) total_qty,
+
+                SUM(subtotal) grand_total,
+
+                MAX(created_at) created_at
+
+            FROM orders
+
+            WHERE status='approved' and invoice_no is null
+
+            GROUP BY lid
+
+            ORDER BY MAX(created_at) DESC
             `);
 
         res.render(
@@ -445,9 +469,104 @@ app.get(
                 "Orders",
 
                 pageDescription:
-                "Daftar pesanan yang telah diapprove",
+                "Daftar Produk Yang Berhasil di Dapatkan",
 
                 orders
+            }
+        );
+
+    }
+);
+
+// Order Detail
+// app.get(
+//     "/orders/:lid",
+//     async (req,res) => {
+
+//         const pool =
+//             require("./database/db");
+
+//         const [orders] =
+//             await pool.query(
+//                 `
+//                 SELECT *
+//                 FROM orders
+//                 WHERE lid=?
+//                 AND status='approved' and invoice_no is null
+//                 `,
+//                 [req.params.lid]
+//             );
+
+//         res.render(
+//             "order-detail",
+//             {
+//                 activePage:
+//                     "orders",
+
+//                 pageTitle:
+//                     "Order Detail",
+
+//                 orders
+//             }
+//         );
+
+//     }
+// );
+app.get(
+    "/orders/:nohp",
+    async (req,res) => {
+
+        const pool =
+            require("./database/db");
+
+        const nohp =
+            req.params.nohp;
+
+        const [orders] =
+            await pool.query(
+                `
+                SELECT *
+                FROM orders
+                WHERE nohp=?
+                AND status='approved' 
+                AND invoice_no is null
+                ORDER BY id DESC
+                `,
+                [nohp]
+            );
+
+        const [[summary]] =
+            await pool.query(
+                `
+                SELECT
+
+                    COUNT(*) total_produk,
+
+                    SUM(qty) total_qty,
+
+                    SUM(subtotal) grand_total
+
+                FROM orders
+
+                WHERE nohp=?
+                AND status='approved' 
+                AND invoice_no is null
+                `,
+                [nohp]
+            );
+
+        res.render(
+            "order-detail",
+            {                
+                activePage: "orders",
+
+                pageTitle: "Order Detail",
+
+                pageDescription: "Detail Produk Yang Berhasil di Dapatkan",
+
+                orders,
+
+                summary
             }
         );
 
@@ -520,12 +639,23 @@ app.get(
         const [items] =
             await pool.query(
                 `
-                SELECT *
-                FROM invoice_items
-                WHERE invoice_no=?
+               SELECT
+
+                    ii.*,
+
+                    o.photo_path
+
+                FROM invoice_items ii
+
+                LEFT JOIN orders o
+                    ON o.invoice_no = ii.invoice_no
+                    AND o.produk = ii.produk
+
+                WHERE ii.invoice_no = ?
                 `,
                 [invoiceNo]
             );
+            
 
         res.render(
             "invoice-detail",
@@ -714,105 +844,250 @@ app.post(
     }
 );
 
-// Generate Invoice for Orders
-app.post(
-    "/orders/generate-invoice",
-    async (req, res) => {
+// // Generate Invoice for Orders
+// app.post(
+//     "/orders/generate-invoice",
+//     async (req, res) => {
 
-        try {
+//         try {
+
+//             const pool =
+//                 require("./database/db");
+
+//             const ids =
+//                 req.body.ids || [];
+
+//             const [orders] =
+//                 await pool.query(
+//                     `
+//                     SELECT *
+//                     FROM orders
+//                     WHERE id IN (?)
+//                     `,
+//                     [ids]
+//                 );
+
+//             const groups =
+//                 {};
+
+//             for (
+//                 const order
+//                 of orders
+//             ) {
+
+//                 if (
+//                     !groups[
+//                         order.nohp
+//                     ]
+//                 ) {
+
+//                     groups[
+//                         order.nohp
+//                     ] = [];
+
+//                 }
+
+//                 groups[
+//                     order.nohp
+//                 ].push(
+//                     order
+//                 );
+
+//             }
+
+//             for (
+//                 const nohp
+//                 in groups
+//             ) {
+
+//                 const invoiceNo =
+//                     generateInvoiceNo();
+
+//                 const orderIds =
+//                     groups[
+//                         nohp
+//                     ].map(
+//                         x => x.id
+//                     );
+
+//                 await pool.query(
+//                     `
+//                     UPDATE orders
+//                     SET invoice_no = ?
+//                     WHERE id IN (?)
+//                     `,
+//                     [
+//                         invoiceNo,
+//                         orderIds
+//                     ]
+//                 );
+
+//             }
+
+//             res.json({
+
+//                 success: true,
+
+//                 message:
+//                     "Invoice berhasil dibuat"
+
+//             });
+
+//         } catch (err) {
+
+//             console.log(err);
+
+//             res.json({
+
+//                 success: false,
+
+//                 message:
+//                     "Terjadi kesalahan"
+
+//             });
+
+//         }
+
+//     }
+// );
+app.post(
+    "/orders/generate-invoice/:nohp",
+    async (req,res) => {
+
+        try{
 
             const pool =
                 require("./database/db");
 
-            const ids =
-                req.body.ids || [];
+            const nohp =
+                req.params.nohp;
 
             const [orders] =
                 await pool.query(
                     `
                     SELECT *
                     FROM orders
-                    WHERE id IN (?)
+                    WHERE nohp=?
+                    AND status='approved'
                     `,
-                    [ids]
+                    [nohp]
                 );
 
-            const groups =
-                {};
-
-            for (
-                const order
-                of orders
-            ) {
-
-                if (
-                    !groups[
-                        order.nohp
-                    ]
-                ) {
-
-                    groups[
-                        order.nohp
-                    ] = [];
-
-                }
-
-                groups[
-                    order.nohp
-                ].push(
-                    order
-                );
-
+            if(
+                orders.length === 0
+            ){
+                return res.json({
+                    success:false
+                });
             }
 
-            for (
-                const nohp
-                in groups
-            ) {
+            const invoiceNo =
+                generateInvoiceNo();
 
-                const invoiceNo =
-                    generateInvoiceNo();
+            const nama =
+                orders[0].nama;
 
-                const orderIds =
-                    groups[
-                        nohp
-                    ].map(
-                        x => x.id
-                    );
+            const totalItem =
+                orders.length;
+
+            const totalQty =
+                orders.reduce(
+                    (a,b)=>
+                    a + Number(b.qty),
+                    0
+                );
+
+            const grandTotal =
+                orders.reduce(
+                    (a,b)=>
+                    a + Number(b.subtotal),
+                    0
+                );
+
+            await pool.query(
+                `
+                INSERT INTO invoices
+                (
+                    invoice_no,
+                    nohp,
+                    nama,
+                    total_item,
+                    total_qty,
+                    grand_total,
+                    status
+                )
+                VALUES
+                (
+                    ?,?,?,?,?,?,'unpaid'
+                )
+                `,
+                [
+                    invoiceNo,
+                    nohp,
+                    nama,
+                    totalItem,
+                    totalQty,
+                    grandTotal
+                ]
+            );
+
+            for(
+                const item
+                of orders
+            ){
 
                 await pool.query(
                     `
-                    UPDATE orders
-                    SET invoice_no = ?
-                    WHERE id IN (?)
+                    INSERT INTO invoice_items
+                    (
+                        invoice_no,
+                        produk,
+                        harga,
+                        qty,
+                        subtotal
+                    )
+                    VALUES
+                    (?,?,?,?,?)
                     `,
                     [
                         invoiceNo,
-                        orderIds
+                        item.produk,
+                        item.harga,
+                        item.qty,
+                        item.subtotal
                     ]
                 );
 
             }
 
+            await pool.query(
+                `
+                UPDATE orders
+                SET invoice_no=?
+                WHERE nohp=?
+                AND status='approved'
+                `,
+                [
+                    invoiceNo,
+                    nohp
+                ]
+            );
+
             res.json({
 
-                success: true,
+                success:true,
 
-                message:
-                    "Invoice berhasil dibuat"
+                invoiceNo
 
             });
 
-        } catch (err) {
+        }catch(err){
 
             console.log(err);
 
             res.json({
 
-                success: false,
-
-                message:
-                    "Terjadi kesalahan"
+                success:false
 
             });
 

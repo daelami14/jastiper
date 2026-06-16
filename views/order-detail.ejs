@@ -1,0 +1,266 @@
+<div class="row">
+
+    <div class="col-12">
+
+        <div class="card">
+
+            <div class="card-body">
+
+                <h2>
+
+                    <%= orders[0].nama %>
+
+                </h2>
+
+                <div class="text-secondary">
+
+                    <%= orders[0].nohp %>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="row mt-3">
+
+    <div class="col-md-4">
+
+        <div class="card">
+
+            <div class="card-body">
+
+                <div class="text-secondary">
+
+                    Total Produk
+
+                </div>
+
+                <div class="h1">
+
+                    <%= summary.total_produk %>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col-md-4">
+
+        <div class="card">
+
+            <div class="card-body">
+
+                <div class="text-secondary">
+
+                    Total Qty
+
+                </div>
+
+                <div class="h1">
+
+                    <%= summary.total_qty %>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col-md-4">
+
+        <div class="card">
+
+            <div class="card-body">
+
+                <div class="text-secondary">
+
+                    Grand Total
+
+                </div>
+
+                <div class="h3">
+
+                    Rp
+                    <%= Number(summary.grand_total)
+                    .toLocaleString('id-ID') %>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="card mt-3">
+
+    <div class="card-header d-flex justify-content-between">
+
+        <h3 class="card-title">
+
+            Detail Produk
+
+        </h3>
+
+        <button
+            id="btnGenerateInvoice"
+            class="btn btn-success">
+
+            Generate Invoice
+
+        </button>
+
+    </div>
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table
+                id="orderDetailTable"
+                class="table table-striped table-hover">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Produk</th>
+
+                        <th>Harga</th>
+
+                        <th>Qty</th>
+
+                        <th>Subtotal</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <% orders.forEach(order => { %>
+
+                    <tr>
+
+                        <td>
+
+                            <%= order.produk %>
+
+                        </td>
+
+                        <td>
+
+                            Rp
+                            <%= Number(order.harga)
+                            .toLocaleString('id-ID') %>
+
+                        </td>
+
+                        <td>
+
+                            <%= order.qty %>
+
+                        </td>
+
+                        <td>
+
+                            Rp
+                            <%= Number(order.subtotal)
+                            .toLocaleString('id-ID') %>
+
+                        </td>
+
+                    </tr>
+
+                    <% }) %>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+$(document).ready(function(){
+
+    $('#orderDetailTable').DataTable({
+
+        pageLength: 25,
+
+        responsive: true
+
+    });
+
+});
+
+document
+.getElementById(
+    "btnGenerateInvoice"
+)
+.addEventListener(
+    "click",
+    async () => {
+
+        if(
+            !confirm(
+                "Generate invoice untuk customer ini?"
+            )
+        ){
+            return;
+        }
+
+        const nohp =
+            "<%= orders[0].nohp %>";
+
+        const res =
+            await fetch(
+                `/orders/generate-invoice/${encodeURIComponent(nohp)}`,
+                {
+                    method:"POST"
+                }
+            );
+
+        const data =
+            await res.json();
+
+        if(
+            data.success
+        ){
+
+            alert(
+                "Invoice berhasil dibuat"
+            );
+
+            window.location =
+                "/invoices/" +
+                data.invoiceNo;
+
+        } else {
+
+            alert(
+                "Gagal membuat invoice"
+            );
+
+        }
+
+    }
+);
+
+</script>
