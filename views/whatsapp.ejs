@@ -16,47 +16,125 @@
 
         <div class="card-body">
 
-            <p>
+            <% if(status === "Connected"){ %>
 
-                <strong>Status :</strong>
+                <div
+                    class="alert alert-success">
 
-                <span class="badge bg-danger">
+                    🟢 WhatsApp Connected
 
-                    <%= status %>
-
-                </span>
-
-            </p>
-
-            <p>
-
-                <strong>Phone :</strong>
-
-                <%= phone %>
-
-            </p>
-
-            <% if (qr) { %>
-
-                <img
-                    src="<%= qr %>"
-                    width="300">
+                </div>
 
             <% } else { %>
 
                 <div
-                    class="text-muted">
+                    class="alert alert-danger">
 
-                    QR belum tersedia
+                    🔴 WhatsApp Disconnected
 
                 </div>
 
             <% } %>
+
+            <div
+                class="d-flex gap-2">
+
+                <button
+                    onclick="location.reload()"
+                    class="btn btn-primary">
+
+                    Refresh
+
+                </button>
+
+            </div>
 
         </div>
 
     </div>
 
 </div>
+
+<div class="col-md-4">
+
+    <div class="card bg-green-lt">
+
+        <div class="card-body text-center">
+
+            <div class="text-secondary">
+
+                Order Hari Ini
+
+            </div>
+
+            <h1>
+
+                <%= orderToday ?? 0 %>
+
+            </h1>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+</div>
+
+<div class="row mt-3">
+
+
+<div class="col-md-6">
+
+    <div class="card bg-blue-lt">
+
+        <div class="card-body text-center">
+
+            <div class="text-secondary">
+
+                Interest Order
+
+            </div>
+
+            <h1>
+
+                <%= interestToday ?? 0 %>
+
+            </h1>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="col-md-6">
+
+    <div class="card bg-yellow-lt">
+
+        <div class="card-body text-center">
+
+            <div class="text-secondary">
+
+                Status
+
+            </div>
+
+            <h1>
+
+                <%= status === "Connected"
+                    ? "ONLINE"
+                    : "OFFLINE"
+                %>
+
+            </h1>
+
+        </div>
+
+    </div>
+
+</div>
+
 
 </div>

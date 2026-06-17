@@ -1,0 +1,117 @@
+<div class="card">
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table
+                id="customerTable"
+                class="table table-striped table-hover">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Nama</th>
+
+                        <th>No HP</th>
+
+                        <th>Total Order</th>
+
+                        <th>Total Qty</th>
+
+                        <th>Total Belanja</th>
+
+                        <th>Last Order</th>
+
+                        <th>Action</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <% customers.forEach(customer => { %>
+
+                    <tr>
+
+                        <td>
+
+                            <%= customer.nama %>
+
+                        </td>
+
+                        <td>
+
+                            <%= customer.nohp %>
+
+                        </td>
+
+                        <td>
+
+                            <%= customer.total_order %>
+
+                        </td>
+
+                        <td>
+
+                            <%= customer.total_qty %>
+
+                        </td>
+
+                        <td>
+
+                            Rp
+                            <%= Number(customer.total_belanja)
+                            .toLocaleString('id-ID') %>
+
+                        </td>
+
+                        <td>
+
+                            <%= customer.last_order %>
+
+                        </td>
+
+                        <td>
+
+                            <a
+                                href="/customers/<%= encodeURIComponent(customer.nohp) %>"
+                                class="btn btn-primary btn-sm">
+
+                                Detail
+
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                    <% }) %>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+$(document).ready(function(){
+
+    $('#customerTable').DataTable({
+
+        pageLength: 25,
+
+        responsive: true
+
+    });
+
+});
+
+</script>

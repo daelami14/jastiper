@@ -1,16 +1,97 @@
-<div class="row row-deck row-cards">
-<div class="col-sm-6 col-lg-3">
+<div class="row row-deck row-cards mb-4">
 
-    <div class="card">
+    <div class="col-sm-6 col-lg-3">
 
-        <div class="card-body">
+        <div class="card bg-blue-lt">
 
-            <div class="h1">
-                <%= totalOrders %>
+            <div class="card-body">
+
+                <div class="text-secondary">
+
+                    Orders
+
+                </div>
+
+                <div class="h1">
+
+                    <%= orderStat.total_order %>
+
+                </div>
+
             </div>
 
-            <div>
-                Orders
+        </div>
+
+    </div>
+
+    <div class="col-sm-6 col-lg-3">
+
+        <div class="card bg-green-lt">
+
+            <div class="card-body">
+
+                <div class="text-secondary">
+
+                    Customers
+
+                </div>
+
+                <div class="h1">
+
+                    <%= customerStat.total_customer %>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col-sm-6 col-lg-3">
+
+        <div class="card bg-yellow-lt">
+
+            <div class="card-body">
+
+                <div class="text-secondary">
+
+                    Invoices
+
+                </div>
+
+                <div class="h1">
+
+                    <%= invoiceStat.total_invoice %>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col-sm-6 col-lg-3">
+
+        <div class="card bg-purple-lt">
+
+            <div class="card-body">
+
+                <div class="text-secondary">
+
+                    Revenue
+
+                </div>
+
+                <div class="h3">
+
+                    Rp
+                    <%= Number(revenueStat.revenue)
+                    .toLocaleString('id-ID') %>
+
+                </div>
+
             </div>
 
         </div>
@@ -19,69 +100,9 @@
 
 </div>
 
-<div class="col-sm-6 col-lg-3">
+<div class="row">
 
-    <div class="card">
-
-        <div class="card-body">
-
-            <div class="h1">
-                <%= totalCustomers %>
-            </div>
-
-            <div>
-                Customers
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-<div class="col-sm-6 col-lg-3">
-
-    <div class="card">
-
-        <div class="card-body">
-
-            <div class="h1">
-                <%= totalInvoices %>
-            </div>
-
-            <div>
-                Invoices
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-<div class="col-sm-6 col-lg-3">
-
-    <div class="card">
-
-        <div class="card-body">
-
-            <div class="h1">
-                Rp <%= revenue %>
-            </div>
-
-            <div>
-                Revenue
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-<div class="row mt-4">
-
-    <div class="col-12">
+    <div class="col-md-6">
 
         <div class="card">
 
@@ -89,86 +110,177 @@
 
                 <h3 class="card-title">
 
-                    Invoice Terbaru
+                    🔥 Top Product
 
                 </h3>
 
             </div>
 
-            <div class="table-responsive">
+            <table class="table">
 
-                <table class="table card-table table-vcenter">
+                <thead>
 
-                    <thead>
+                    <tr>
 
-                        <tr>
+                        <th>Produk</th>
 
-                            <th>Invoice</th>
+                        <th>Qty</th>
 
-                            <th>Customer</th>
+                    </tr>
 
-                            <th>Total</th>
+                </thead>
 
-                            <th>Status</th>
+                <tbody>
 
-                        </tr>
+                    <% topProducts.forEach(
+                        product => {
+                    %>
 
-                    </thead>
+                    <tr>
 
-                    <tbody>
+                        <td>
 
-                        <% recentInvoices.forEach(invoice => { %>
+                            <%= product.produk %>
 
-                            <tr>
+                        </td>
 
-                                <td>
+                        <td>
 
-                                    <%= invoice.invoice_no %>
+                            
 
-                                </td>
+                                <%= product.total_qty %>
 
-                                <td>
+                            
 
-                                    <%= invoice.nama %>
+                        </td>
 
-                                </td>
+                    </tr>
 
-                                <td>
+                    <% }) %>
 
-                                    Rp
-                                    <%= Number(invoice.grand_total).toLocaleString('id-ID') %>
+                </tbody>
 
-                                </td>
+            </table>
 
-                                <td>
+        </div>
 
-                                    <% if(invoice.status === 'paid'){ %>
+    </div>
 
-                                        <span class="badge bg-green">
+    <div class="col-md-6">
 
-                                            Paid
+        <div class="card">
 
-                                        </span>
+            <div class="card-header">
 
-                                    <% } else { %>
+                <h3 class="card-title">
 
-                                        <span class="badge bg-yellow">
+                    👑 Top Customer
 
-                                            Unpaid
+                </h3>
 
-                                        </span>
+            </div>
 
-                                    <% } %>
+            <table class="table">
 
-                                </td>
+                <thead>
 
-                            </tr>
+                    <tr>
 
-                        <% }) %>
+                        <th>Nama</th>
 
-                    </tbody>
+                        <th>Total</th>
 
-                </table>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <% topCustomers.forEach(
+                        customer => {
+                    %>
+
+                    <tr>
+
+                        <td>
+
+                            <%= customer.nama %>
+
+                        </td>
+
+                        <td>
+
+                            Rp
+                            <%= Number(
+                                customer.total_belanja
+                            ).toLocaleString('id-ID') %>
+
+                        </td>
+
+                    </tr>
+
+                    <% }) %>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    
+
+</div>
+<div class="row mt-4">
+
+    <div class="col-md-6">
+
+        <div class="card">
+
+            <div class="card-header">
+
+                <h3 class="card-title">
+
+                    📈 Order Harian
+
+                </h3>
+
+            </div>
+
+            <div class="card-body">
+
+                <canvas
+                    id="orderChart">
+
+                </canvas>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col-md-6">
+
+        <div class="card">
+
+            <div class="card-header">
+
+                <h3 class="card-title">
+
+                    💰 Revenue Harian
+
+                </h3>
+
+            </div>
+
+            <div class="card-body">
+
+                <canvas
+                    id="revenueChart">
+
+                </canvas>
 
             </div>
 
@@ -178,4 +290,209 @@
 
 </div>
 
-</div>
+<script>
+
+// ======================
+// ORDER CHART
+// ======================
+
+const orderLabels =
+<%- JSON.stringify(
+    dailyOrders.map(x => {
+
+        const d = new Date(x.tanggal);
+
+        const day =
+            String(
+                d.getDate()
+            ).padStart(
+                2,
+                '0'
+            );
+
+        const month =
+            String(
+                d.getMonth() + 1
+            ).padStart(
+                2,
+                '0'
+            );
+
+        const year =
+            d.getFullYear();
+
+        return `${day}-${month}-${year}`;
+
+    })
+) %>;
+
+const orderData =
+<%- JSON.stringify(
+    dailyOrders.map(
+        x => x.total
+    )
+) %>;
+
+new Chart(
+
+    document.getElementById(
+        "orderChart"
+    ),
+
+    {
+
+        type: "line",
+
+        data: {
+
+            labels:
+                orderLabels,
+
+            datasets: [
+
+                {
+
+                    label:
+                        "Orders",
+
+                    data:
+                        orderData,
+
+                    borderColor:
+                        "#206bc4",
+
+                    backgroundColor:
+                        "rgba(32,107,196,0.1)",
+
+                    tension: 0.3,
+
+                    fill: true
+
+                }
+
+            ]
+
+        },
+
+        options: {
+
+            responsive: true,
+
+            maintainAspectRatio: false
+
+        }
+
+    }
+
+);
+
+// ======================
+// REVENUE CHART
+// ======================
+
+const revenueLabels =
+<%- JSON.stringify(
+    dailyRevenue.map(x => {
+
+        const d = new Date(x.tanggal);
+
+        const day =
+            String(
+                d.getDate()
+            ).padStart(
+                2,
+                '0'
+            );
+
+        const month =
+            String(
+                d.getMonth() + 1
+            ).padStart(
+                2,
+                '0'
+            );
+
+        const year =
+            d.getFullYear();
+
+        return `${day}-${month}-${year}`;
+
+    })
+) %>;
+
+const revenueData =
+<%- JSON.stringify(
+    dailyRevenue.map(
+        x => x.total
+    )
+) %>;
+
+new Chart(
+
+    document.getElementById(
+        "revenueChart"
+    ),
+
+    {
+
+        type: "bar",
+
+        data: {
+
+            labels:
+                revenueLabels,
+
+            datasets: [
+
+                {
+
+                    label:
+                        "Revenue",
+
+                    data:
+                        revenueData,
+
+                    backgroundColor:
+                        "#2fb344"
+
+                }
+
+            ]
+
+        },
+
+        options: {
+
+            responsive: true,
+
+            maintainAspectRatio: false,
+
+            scales: {
+
+                y: {
+
+                    ticks: {
+
+                        callback: function(value){
+
+                            return 'Rp ' +
+                                Number(value)
+                                .toLocaleString(
+                                    'id-ID'
+                                );
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+);
+
+</script>

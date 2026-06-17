@@ -116,101 +116,228 @@ app.use(
 |--------------------------------------------------------------------------
 */
 // Dashboard
+// app.get(
+//     "/",
+//     async (req, res) => {
+
+//         const pool =
+//             require("./database/db");
+
+//         const [[totalOrders]] =
+//             await pool.query(
+//                 `
+//                 SELECT COUNT(*) total
+//                 FROM orders
+//                 WHERE status='approved'
+//                 `
+//             );
+
+//         const [[totalCustomers]] =
+//             await pool.query(
+//                 `
+//                 SELECT COUNT(
+//                     DISTINCT nohp
+//                 ) total
+//                 FROM orders
+//                 `
+//             );
+
+//         const [[pendingInvoices]] =
+//             await pool.query(
+//                 `
+//                 SELECT COUNT(*) total
+//                 FROM invoices
+//                 WHERE status='unpaid'
+//                 `
+//             );
+
+//         const [[totalInvoices]] =
+//             await pool.query(
+//                 `
+//                 SELECT COUNT(*) total
+//                 FROM invoices
+//                 `
+//             );
+
+//         const [[revenue]] =
+//             await pool.query(
+//                 `
+//                 SELECT
+//                     COALESCE(
+//                         SUM(grand_total),
+//                         0
+//                     ) total
+//                 FROM invoices
+//                 WHERE status='paid'
+//                 `
+//             );
+
+//         const [recentInvoices] =
+//             await pool.query(
+//                 `
+//                 SELECT *
+//                 FROM invoices
+//                 ORDER BY id DESC
+//                 LIMIT 10
+//                 `
+//             );
+
+//         res.render(
+//             "dashboard",
+//             {
+//                 activePage:
+//                     "dashboard",
+//                 pageTitle:
+//                     "Dashboard",
+
+//                 pageDescription:
+//                     "Ringkasan aktivitas jastip",
+
+//                 totalOrders:
+//                     totalOrders.total,
+
+//                 totalCustomers:
+//                     totalCustomers.total,
+
+//                 pendingInvoices:
+//                     pendingInvoices.total,
+
+//                 totalInvoices:
+//                     totalInvoices.total,
+
+//                 revenue:
+//                     revenue.total,
+
+//                 recentInvoices :
+//                     recentInvoices
+
+//             }
+//         );
+
+//     }
+// );
 app.get(
     "/",
-    async (req, res) => {
+    async (req,res) => {
 
         const pool =
             require("./database/db");
 
-        const [[totalOrders]] =
-            await pool.query(
-                `
-                SELECT COUNT(*) total
-                FROM orders
-                WHERE status='approved'
-                `
-            );
-
-        const [[totalCustomers]] =
-            await pool.query(
-                `
-                SELECT COUNT(
-                    DISTINCT nohp
-                ) total
-                FROM orders
-                `
-            );
-
-        const [[pendingInvoices]] =
-            await pool.query(
-                `
-                SELECT COUNT(*) total
-                FROM invoices
-                WHERE status='unpaid'
-                `
-            );
-
-        const [[totalInvoices]] =
-            await pool.query(
-                `
-                SELECT COUNT(*) total
-                FROM invoices
-                `
-            );
-
-        const [[revenue]] =
-            await pool.query(
-                `
+        const [[orderStat]] =
+            await pool.query(`
                 SELECT
-                    COALESCE(
+                    COUNT(*) total_order
+                FROM orders
+            `);
+
+        const [[customerStat]] =
+            await pool.query(`
+                SELECT
+                    COUNT(DISTINCT nohp)
+                    total_customer
+                FROM orders
+            `);
+
+        const [[invoiceStat]] =
+            await pool.query(`
+                SELECT
+                    COUNT(*) total_invoice
+                FROM invoices
+            `);
+
+        const [[revenueStat]] =
+            await pool.query(`
+                SELECT
+                    IFNULL(
                         SUM(grand_total),
                         0
-                    ) total
+                    ) revenue
                 FROM invoices
                 WHERE status='paid'
-                `
-            );
+            `);
 
-        const [recentInvoices] =
-            await pool.query(
-                `
-                SELECT *
-                FROM invoices
-                ORDER BY id DESC
+        const [topProducts] =
+            await pool.query(`
+                SELECT
+                    produk,
+                    SUM(qty) total_qty
+                FROM orders
+                GROUP BY produk
+                ORDER BY total_qty DESC
                 LIMIT 10
-                `
-            );
+            `);
+
+        const [topCustomers] =
+            await pool.query(`
+                SELECT
+                    MAX(nama) nama,
+                    nohp,
+                    SUM(subtotal)
+                    total_belanja
+                FROM orders
+                GROUP BY nohp
+                ORDER BY total_belanja DESC
+                LIMIT 10
+            `);
+
+        const [dailyOrders] =
+        await pool.query(`
+            SELECT
+
+                DATE(created_at) tanggal ,
+
+                COUNT(*) total
+
+            FROM orders
+
+            GROUP BY DATE(created_at)
+
+            ORDER BY tanggal ASC
+
+            LIMIT 30
+        `);
+
+        const [dailyRevenue] =
+        await pool.query(`
+            SELECT
+
+                DATE(created_at) tanggal,
+
+                SUM(grand_total) total
+
+            FROM invoices
+
+            WHERE status='paid'
+
+            GROUP BY DATE(created_at)
+
+            ORDER BY tanggal ASC
+
+            LIMIT 30
+        `);
 
         res.render(
             "dashboard",
             {
                 activePage:
                     "dashboard",
+
                 pageTitle:
                     "Dashboard",
 
                 pageDescription:
-                    "Ringkasan aktivitas jastip",
+                    "Overview Bisnis",
 
-                totalOrders:
-                    totalOrders.total,
+                orderStat,
+                customerStat,
+                invoiceStat,
+                revenueStat,
 
-                totalCustomers:
-                    totalCustomers.total,
+                topProducts,
+                topCustomers,
 
-                pendingInvoices:
-                    pendingInvoices.total,
-
-                totalInvoices:
-                    totalInvoices.total,
-
-                revenue:
-                    revenue.total,
-
-                recentInvoices :
-                    recentInvoices
-
+                dailyOrders,
+                dailyRevenue
             }
         );
 
@@ -1096,6 +1223,123 @@ app.post(
     }
 );
 
+//customer
+app.get(
+    "/customers",
+    async (req,res) => {
+
+        const pool =
+            require("./database/db");
+
+        const [customers] =
+            await pool.query(
+                `
+                SELECT
+
+                    nohp,
+
+                    MAX(nama) nama,
+
+                    COUNT(*) total_order,
+
+                    SUM(qty) total_qty,
+
+                    SUM(subtotal) total_belanja,
+
+                    MAX(created_at) last_order
+
+                FROM orders
+
+                GROUP BY nohp
+
+                ORDER BY total_belanja DESC
+                `
+            );
+
+        res.render(
+            "customers",
+            {
+                activePage:
+                    "customers",
+
+                pageTitle:
+                    "Customers",
+
+                pageDescription:
+                    "Daftar Customer",
+
+                customers
+            }
+        );
+
+    }
+);
+
+//customer detail
+app.get(
+    "/customers/:nohp",
+    async (req,res) => {
+
+        const pool =
+            require("./database/db");
+
+        const nohp =
+            req.params.nohp;
+
+        const [orders] =
+        await pool.query(
+            `
+            SELECT
+                id,
+                nama,
+                nohp,
+                produk,
+                harga,
+                qty,
+                subtotal,
+                status,
+                invoice_no,
+                photo_path,
+                created_at
+            FROM orders
+            WHERE nohp=?
+            ORDER BY id DESC
+            `,
+            [nohp]
+        );
+
+        if(
+            orders.length === 0
+        ){
+
+            return res.redirect(
+                "/customers"
+            );
+
+        }
+
+        res.render(
+            "customer-detail",
+            {
+                activePage:
+                    "customers",
+
+                pageTitle:
+                    "Customer Detail",
+
+                pageDescription:
+                    "Riwayat Customer",
+
+                customer:
+                    orders[0],
+
+                orders
+            }
+        );
+
+    }
+);
+
 
 const QRCode =
     require("qrcode");
@@ -1111,6 +1355,21 @@ app.get(
     async (req, res) => {
 
         try {
+            const [[orderToday]] =
+            await pool.query(`
+                SELECT
+                    COUNT(*) total
+                FROM orders
+                WHERE DATE(created_at)=CURDATE()
+            `);
+
+            const [[interestToday]] =
+            await pool.query(`
+                SELECT
+                    COUNT(*) total
+                FROM interest_orders
+                WHERE DATE(created_at)=CURDATE()
+            `);
 
             let qrImage = null;
 
@@ -1144,7 +1403,12 @@ app.get(
                         "-",
 
                     qr:
-                        qrImage
+                        qrImage,
+
+                    orderToday:
+                        orderToday.total,
+                    interestToday:
+                        interestToday.total
                 }
             );
 
@@ -1155,6 +1419,14 @@ app.get(
             res.render(
                 "whatsapp",
                 {
+                    activePage:
+                        "whatsapp",
+                    pageTitle:
+                        "WhatsApp",
+
+                    pageDescription:
+                        "Status koneksi WhatsApp",
+
                     status:
                         "Disconnected",
 
@@ -1162,7 +1434,12 @@ app.get(
                         "-",
 
                     qr:
-                        null
+                        null,
+
+                    orderToday:
+                        0,
+                    interestToday:
+                        0
                 }
             );
 
