@@ -223,12 +223,59 @@ app.get(
         const pool =
             require("./database/db");
 
+        const {
+            startDate = "",
+            endDate = ""
+        } = req.query;
+
+        const dateParams = [];
+        const dateConditions = [];
+
+        if(startDate){
+            dateConditions.push(
+                "DATE(created_at) >= ?"
+            );
+            dateParams.push(startDate);
+        }
+
+        if(endDate){
+            dateConditions.push(
+                "DATE(created_at) <= ?"
+            );
+            dateParams.push(endDate);
+        }
+
+        const orderWhereSql =
+            dateConditions.length
+                ? `WHERE ${dateConditions.join(" AND ")}`
+                : "";
+
+        const invoiceWhereSql =
+            dateConditions.length
+                ? `WHERE ${dateConditions.join(" AND ")}`
+                : "";
+
+        const paidInvoiceWhereSql =
+            ["status='paid'", ...dateConditions]
+                .length
+                    ? `WHERE ${[
+                        "status='paid'",
+                        ...dateConditions
+                    ].join(" AND ")}`
+                    : "";
+
+        const chartLimitSql =
+            startDate || endDate
+                ? ""
+                : "LIMIT 30";
+
         const [[orderStat]] =
             await pool.query(`
                 SELECT
                     COUNT(*) total_order
                 FROM orders
-            `);
+                ${orderWhereSql}
+            `, dateParams);
 
         const [[customerStat]] =
             await pool.query(`
@@ -236,14 +283,16 @@ app.get(
                     COUNT(DISTINCT nohp)
                     total_customer
                 FROM orders
-            `);
+                ${orderWhereSql}
+            `, dateParams);
 
         const [[invoiceStat]] =
             await pool.query(`
                 SELECT
                     COUNT(*) total_invoice
                 FROM invoices
-            `);
+                ${invoiceWhereSql}
+            `, dateParams);
 
         const [[revenueStat]] =
             await pool.query(`
@@ -253,8 +302,8 @@ app.get(
                         0
                     ) revenue
                 FROM invoices
-                WHERE status='paid'
-            `);
+                ${paidInvoiceWhereSql}
+            `, dateParams);
 
         const [topProducts] =
             await pool.query(`
@@ -262,10 +311,11 @@ app.get(
                     produk,
                     SUM(qty) total_qty
                 FROM orders
+                ${orderWhereSql}
                 GROUP BY produk
                 ORDER BY total_qty DESC
                 LIMIT 10
-            `);
+            `, dateParams);
 
         const [topCustomers] =
             await pool.query(`
@@ -275,10 +325,11 @@ app.get(
                     SUM(subtotal)
                     total_belanja
                 FROM orders
+                ${orderWhereSql}
                 GROUP BY nohp
                 ORDER BY total_belanja DESC
                 LIMIT 10
-            `);
+            `, dateParams);
 
         const [dailyOrders] =
         await pool.query(`
@@ -290,12 +341,14 @@ app.get(
 
             FROM orders
 
+            ${orderWhereSql}
+
             GROUP BY DATE(created_at)
 
             ORDER BY tanggal ASC
 
-            LIMIT 30
-        `);
+            ${chartLimitSql}
+        `, dateParams);
 
         const [dailyRevenue] =
         await pool.query(`
@@ -307,14 +360,14 @@ app.get(
 
             FROM invoices
 
-            WHERE status='paid'
+            ${paidInvoiceWhereSql}
 
             GROUP BY DATE(created_at)
 
             ORDER BY tanggal ASC
 
-            LIMIT 30
-        `);
+            ${chartLimitSql}
+        `, dateParams);
 
         res.render(
             "dashboard",
@@ -327,6 +380,9 @@ app.get(
 
                 pageDescription:
                     "Overview Bisnis",
+
+                startDate,
+                endDate,
 
                 orderStat,
                 customerStat,
