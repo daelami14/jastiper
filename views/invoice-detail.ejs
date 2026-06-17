@@ -365,17 +365,21 @@ document
 
         if(data.success){
 
-            alert(
-                "Invoice berhasil dikirim"
-            );
+            Swal.fire({
+                title: "Berhasil",
+                text: "Invoice berhasil dikirim",
+                icon: "success"
+            });
 
             location.reload();
 
         }else{
 
-            alert(
-                "Gagal kirim invoice"
-            );
+            Swal.fire({
+                title: "Gagal",
+                text: "Gagal kirim invoice",
+                icon: "error"
+            });
 
         }
 
@@ -388,11 +392,19 @@ document
     "click",
     async () => {
 
-        if(
-            !confirm(
-                "Tandai invoice sebagai PAID ?"
-            )
-        ){
+        // Use SweetAlert2 for confirmation instead of browser's native confirm
+        const { isConfirmed } = await Swal.fire({
+            title: "Konfirmasi",
+            text: "Tandai invoice sebagai PAID ?",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Ya, Tandai",
+            cancelButtonText: "Batal"
+        });
+        
+        if(!isConfirmed){
             return;
         }
 
@@ -409,9 +421,13 @@ document
 
         if(data.success){
 
-            alert(
-                "Invoice berhasil dibayar"
-            );
+            Swal.fire({
+                title: "Berhasil",
+                text: "Invoice berhasil dibayar",
+                icon: "success"
+            });
+
+
 
             location.reload();
 

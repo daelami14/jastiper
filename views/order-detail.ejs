@@ -218,13 +218,17 @@ document
     "click",
     async () => {
 
-        if(
-            !confirm(
-                "Generate invoice untuk customer ini?"
-            )
-        ){
-            return;
-        }
+            const result = await Swal.fire({
+                title: "Konfirmasi",
+                text: "Generate invoice untuk customer ini?",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "Ya, Generate",
+                cancelButtonText: "Batal"
+            });
+            if(!result.isConfirmed){
+                return;
+            }
 
         const nohp =
             "<%= orders[0].nohp %>";
@@ -244,9 +248,13 @@ document
             data.success
         ){
 
-            alert(
-                "Invoice berhasil dibuat"
-            );
+            Swal.fire({
+                title: "Berhasil",
+                text: "Invoice berhasil dibuat",
+                icon: "success"
+            });
+
+
 
             window.location =
                 "/invoices/" +
@@ -254,9 +262,11 @@ document
 
         } else {
 
-            alert(
-                "Gagal membuat invoice"
-            );
+            Swal.fire({
+                title: "Gagal",
+                text: "Gagal membuat invoice",
+                icon: "error"
+            });
 
         }
 

@@ -220,9 +220,11 @@ document
                 ids.length === 0
             ) {
 
-                alert(
-                    "Pilih order terlebih dahulu"
-                );
+                Swal.fire({
+                    title: "Pilih Order",
+                    text: "Pilih order terlebih dahulu",
+                    icon: "warning"
+                });
 
                 return;
 
