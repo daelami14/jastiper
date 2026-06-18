@@ -15,6 +15,8 @@ const {
     orderExists
 } = require("./orderHandler");
 
+
+
 const fs =
     require("fs");
 
@@ -94,11 +96,15 @@ async function startWhatsApp() {
         sock.ev.on(
             "messages.upsert",
             async ({ messages }) => {
-
                 try {
-
                     const msg =
                         messages[0];
+
+                    const text =
+                    msg.message?.conversation ||
+                    msg.message?.extendedTextMessage?.text ||
+                    "";
+
 
                     if (!msg)
                         return;
@@ -112,6 +118,191 @@ async function startWhatsApp() {
                             chatId
                         )
                     ) {
+                        console.log(
+                            "⛔ Bukan group terizink"
+                        );
+                        return;
+                    }
+
+                    const {
+                        parsePO
+                    } = require("./parser");
+
+                    let harga = 0;
+
+                    const hargaLine =
+                        text
+                            .split("\n")
+                            .find(
+                                x => x.includes("💰")
+                            );
+
+                    if (hargaLine) {
+
+                        const hargaText =
+                            hargaLine
+                                .replace("💰", "")
+                                .trim();
+
+                        const parts =
+                            hargaText
+                                .split("+")
+                                .map(
+                                    x =>
+                                        parseInt(
+                                            x.replace(/\./g, "").trim()
+                                        ) || 0
+                                );
+
+                        harga =
+                            parts.reduce(
+                                (a, b) => a + b,
+                                0
+                            );
+
+                    }
+
+                    console.log(
+                        "Harga PO:",
+                        harga
+                    );
+
+                    const items =
+                        parsePO(text);
+
+                    const lines =
+                        text
+                            .split("\n")
+                            .map(
+                                x => x.trim()
+                            )
+                            .filter(Boolean);
+
+                    const poTitle =
+                        lines[0] || "";
+
+                    
+                    const imageMsgID =
+                        `PO_${poTitle
+                            .replace(/[^a-zA-Z0-9]/g, "_")
+                            .toUpperCase()}_${harga}`;
+
+                    if(items.length){
+
+                        console.log(
+                            "HASIL PARSER",
+                            items
+                        );
+
+                        const pool =
+                            require("../database/db");
+
+                        const lid =
+                        msg.key.participant ||
+                        msg.key.participantAlt ||
+                        "";
+
+                        const nohp =
+                            (
+                                msg.key.participantAlt ||
+                                msg.key.participant ||
+                                ""
+                            )
+                            .replace(
+                                "@s.whatsapp.net",
+                                ""
+                            );
+
+                        for(
+                            const item
+                            of items
+                        ){
+                            const subtotal =
+                            item.qty * harga;
+
+                                console.log(
+                                    item.produk,
+                                    item.qty,
+                                    harga,
+                                    subtotal
+                                );
+
+                            const [[exists]] =
+                                    await pool.query(
+                                        `
+                                        SELECT id
+                                        FROM orders
+                                        WHERE image_msg_id = ?
+                                        AND nama = ?
+                                        AND produk = ?
+                                        and pesan = ?
+                                        LIMIT 1
+                                        `,
+                                        [
+                                            imageMsgID,
+                                            item.nama,
+                                            poTitle,
+                                            item.produk
+                                        ]
+                                    );
+
+                                if(exists){
+                                    console.log(
+                                        "✅ Item already exists"
+                                    );
+
+                                    continue;
+
+                                }
+
+                            await pool.query(
+                                `
+                                INSERT INTO orders
+                                (
+                                    lid,
+                                    nama,
+                                    nohp,
+                                    produk,
+                                    image_msg_id,
+                                    pesan,
+                                    qty,
+                                    harga,
+                                    subtotal,
+                                    status
+                                )
+                                VALUES
+                                (
+                                    ?,
+                                    ?,
+                                    ?,                      
+                                    ?,
+                                    ?,
+                                    ?,
+                                    ?,
+                                    ?,
+                                    ?,
+                                    'draft'
+                                )
+                                `,
+                                [
+                                    lid,
+                                    item.nama,
+                                    nohp,
+                                    poTitle,
+                                    imageMsgID,
+                                    item.produk,
+                                    item.qty,
+                                    harga,
+                                    subtotal
+                                ]
+                            );
+
+                        }
+
+                        console.log(
+                            "✅ PO Format Saved"
+                        );
+
                         return;
                     }
 
