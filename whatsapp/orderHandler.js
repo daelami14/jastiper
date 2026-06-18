@@ -7,6 +7,7 @@ async function saveOrder(data) {
         `
         INSERT INTO orders
         (
+            user_id,
             lid,
             nohp,
             nama,
@@ -26,10 +27,11 @@ async function saveOrder(data) {
         )
         VALUES
         (
-            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
         )
         `,
         [
+            data.userId,
             data.lid,
             data.nohp,
             data.nama,
@@ -51,28 +53,43 @@ async function saveOrder(data) {
 }
 
 async function approveOrder(
+    userId,
     customerMsgID,
     photoPath
 ) {
 
-    const [result] =
-    await pool.query(
-        `
+    const values = [userId];
+    let query = `
         UPDATE orders
-        SET status='approved',
-        photo_path=?
-        WHERE customer_msg_id=?
-        `,
-        [
-            photoPath,
-            customerMsgID
-        ]
-    );
+        SET status='approved'
+    `;
+
+    if (photoPath) {
+
+        query += `,
+        photo_path=?`;
+        values.unshift(photoPath);
+
+    }
+
+    query += `
+        WHERE user_id=?
+        AND customer_msg_id=?
+    `;
+    values.push(customerMsgID);
+
+    const [result] =
+        await pool.query(
+            query,
+            values
+        );
+
     return result;
 
 }
 
 async function getOrderByCustomerMsgID(
+    userId,
     customerMsgID
 ) {
 
@@ -81,10 +98,14 @@ async function getOrderByCustomerMsgID(
             `
             SELECT *
             FROM orders
-            WHERE customer_msg_id = ?
+            WHERE user_id = ?
+            AND customer_msg_id = ?
             LIMIT 1
             `,
-            [customerMsgID]
+            [
+                userId,
+                customerMsgID
+            ]
         );
 
     return rows[0];
@@ -92,6 +113,7 @@ async function getOrderByCustomerMsgID(
 }
 
 async function orderExists(
+    userId,
     customerMsgID
 ) {
 
@@ -100,10 +122,14 @@ async function orderExists(
             `
             SELECT id
             FROM orders
-            WHERE customer_msg_id = ?
+            WHERE user_id = ?
+            AND customer_msg_id = ?
             LIMIT 1
             `,
-            [customerMsgID]
+            [
+                userId,
+                customerMsgID
+            ]
         );
 
     return rows.length > 0;

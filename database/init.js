@@ -25,11 +25,28 @@ async function initDatabase() {
             `USE ${dbName}`
         );
 
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                google_id VARCHAR(255) NOT NULL UNIQUE,
+                email VARCHAR(255) NOT NULL UNIQUE,
+                display_name VARCHAR(255),
+                photo_url TEXT,
+                created_at DATETIME
+                DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME
+                DEFAULT CURRENT_TIMESTAMP
+                ON UPDATE CURRENT_TIMESTAMP
+            );
+        `);
+
 
         await pool.query(`
             CREATE TABLE IF NOT EXISTS orders (
 
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+                user_id BIGINT,
 
                 created_at DATETIME
                 DEFAULT CURRENT_TIMESTAMP,
@@ -68,6 +85,7 @@ async function initDatabase() {
                 image_data LONGTEXT,
 
 
+                INDEX idx_user_id (user_id),
                 INDEX idx_lid (lid),
 
                 INDEX idx_invoice (invoice_no),
@@ -81,6 +99,8 @@ async function initDatabase() {
             CREATE TABLE IF NOT EXISTS invoices
             (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+                user_id BIGINT,
 
                 invoice_no VARCHAR(50) NOT NULL UNIQUE,
 
@@ -96,7 +116,9 @@ async function initDatabase() {
 
                 status VARCHAR(30) DEFAULT 'unpaid',
 
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+                INDEX idx_invoice_user_id (user_id)
             );
         `);
 
@@ -104,6 +126,8 @@ async function initDatabase() {
             CREATE TABLE IF NOT EXISTS invoice_items (
 
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+            user_id BIGINT,
 
             invoice_no VARCHAR(50),
 
@@ -113,7 +137,9 @@ async function initDatabase() {
 
             qty INT,
 
-            subtotal INT
+            subtotal INT,
+
+            INDEX idx_invoice_items_user_id (user_id)
 
         );
         `);
@@ -122,6 +148,8 @@ async function initDatabase() {
            CREATE TABLE IF NOT EXISTS settings (
 
                 id INT AUTO_INCREMENT PRIMARY KEY,
+
+                user_id BIGINT,
 
                 setting_key VARCHAR(100) UNIQUE,
 
@@ -134,6 +162,8 @@ async function initDatabase() {
            CREATE TABLE IF NOT EXISTS customers (
 
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+                user_id BIGINT,
 
                 lid VARCHAR(100) UNIQUE,
 
@@ -156,7 +186,9 @@ async function initDatabase() {
 
                 id INT AUTO_INCREMENT PRIMARY KEY,
 
-                group_id VARCHAR(100) UNIQUE,
+                user_id BIGINT,
+
+                group_id VARCHAR(100),
 
                 group_name VARCHAR(255),
 

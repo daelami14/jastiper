@@ -49,6 +49,42 @@
 
             </div>
 
+            <div class="mt-4">
+
+                <div class="text-secondary mb-2">
+                    Nomor WhatsApp
+                </div>
+
+                <div class="h3">
+                    <%= phone || "-" %>
+                </div>
+
+            </div>
+
+            <% if(qr){ %>
+
+                <div class="mt-4 text-center">
+
+                    <div class="text-secondary mb-3">
+                        Scan QR ini dengan akun WhatsApp Anda
+                    </div>
+
+                    <img
+                        src="<%= qr %>"
+                        alt="QR WhatsApp"
+                        class="img-fluid"
+                        style="max-width:280px;">
+
+                </div>
+
+            <% } else if(status !== "Connected") { %>
+
+                <div class="alert alert-warning mt-4 mb-0">
+                    QR sedang dipersiapkan. Refresh halaman ini beberapa detik lagi bila belum muncul.
+                </div>
+
+            <% } %>
+
         </div>
 
     </div>

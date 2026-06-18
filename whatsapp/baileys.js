@@ -2,665 +2,650 @@ const {
     default: makeWASocket,
     useMultiFileAuthState,
     fetchLatestBaileysVersion,
+    downloadMediaMessage,
     DisconnectReason
 } = require("@whiskeysockets/baileys");
-
-
-const P = require("pino");
+const P =
+    require("pino");
+const fs =
+    require("fs");
+const path =
+    require("path");
+const pool =
+    require("../database/db");
 
 const {
     saveOrder,
-    approveOrder,   
+    approveOrder,
     getOrderByCustomerMsgID,
     orderExists
 } = require("./orderHandler");
-
-const fs =
-    require("fs");
-
-const path =
-    require("path");
-
 const {
-    downloadMediaMessage
-} = require("@whiskeysockets/baileys");
-
-const state = require("./state");
-
+    isAllowedGroup
+} = require("../database/groups");
 const {
-    setSocket
-} = require(
-    "./socketStore"
-);
+    setSocket,
+    getSocket,
+    removeSocket
+} = require("./socketStore");
+const {
+    getState,
+    setState
+} = require("./state");
 
-const ALLOWED_GROUPS = [
+const startPromises =
+    new Map();
 
-    "120363403061057636@g.us",
-    "120363212854284513@g.us"
+function normalizeJid(jid = "") {
 
-];
+    return String(jid)
+        .split("@")[0]
+        .split(":")[0];
 
-const ADMINS = [
+}
 
-    "6281808385596@s.whatsapp.net",
-    "222591159693354@s.whatsapp.net", //audi
-    "274006129287259@s.whatsapp.net", //gw
-    "222591159693354@lid"
+function getAuthDir(userId) {
 
+    return path.join(
+        __dirname,
+        "../auth",
+        String(userId)
+    );
 
-];
+}
 
-async function startWhatsApp() {
+function hasWhatsAppAuth(userId) {
 
-    try {
+    const authDir =
+        getAuthDir(userId);
 
-        console.log("🚀 Starting WhatsApp...");
+    if (
+        !fs.existsSync(authDir)
+    ) {
+        return false;
+    }
 
-        const {
-            state: authState,
-            saveCreds
-        } = await useMultiFileAuthState("./auth");
+    const files =
+        fs.readdirSync(authDir);
 
-        const {
-            version
-        } = await fetchLatestBaileysVersion();
+    return files.length > 0;
 
-        console.log(
-            "Baileys Version:",
-            version
+}
+
+function parseHarga(captionLine = "") {
+
+    const hargaText =
+        captionLine
+            .toLowerCase()
+            .replace(/rp/gi, "")
+            .replace(/\./g, "")
+            .replace(/\s+/g, "")
+            .replace(/k/g, "");
+
+    if (!hargaText) {
+        return 0;
+    }
+
+    if (
+        hargaText.includes("+")
+    ) {
+        return hargaText
+            .split("+")
+            .reduce(
+                (sum, item) =>
+                    sum +
+                    parseInt(item || 0, 10),
+                0
+            ) * 1000;
+    }
+
+    return (
+        parseInt(hargaText || 0, 10) *
+        1000
+    );
+
+}
+
+async function saveQuotedImage({
+    sock,
+    imageMessage,
+    fileName
+}) {
+
+    const uploadDir =
+        path.join(
+            __dirname,
+            "../public/uploads"
+        );
+    const savePath =
+        path.join(
+            uploadDir,
+            fileName
         );
 
-        const sock = makeWASocket({
+    fs.mkdirSync(
+        uploadDir,
+        { recursive: true }
+    );
 
-            version,
+    if (
+        !fs.existsSync(savePath)
+    ) {
+        const buffer =
+            await downloadMediaMessage(
+                {
+                    message: {
+                        imageMessage
+                    }
+                },
+                "buffer",
+                {},
+                {
+                    logger: P({
+                        level: "silent"
+                    }),
+                    reuploadRequest:
+                        sock.updateMediaMessage
+                }
+            );
 
-            auth: authState,
+        fs.writeFileSync(
+            savePath,
+            buffer
+        );
+    }
 
-            logger: P({
-                level: "silent"
-            })
+    return `/uploads/${fileName}`;
 
+}
+
+async function handleIncomingOrder({
+    sock,
+    userId,
+    msg
+}) {
+
+    const chatId =
+        msg.key.remoteJid || "";
+
+    if (
+        !chatId.endsWith("@g.us")
+    ) {
+        return;
+    }
+
+    const allowed =
+        await isAllowedGroup(
+            userId,
+            chatId
+        );
+
+    if (!allowed) {
+        return;
+    }
+
+    const ext =
+        msg.message?.extendedTextMessage;
+
+    if (
+        !ext?.contextInfo?.quotedMessage?.imageMessage
+    ) {
+        return;
+    }
+
+    const ownerJid =
+        normalizeJid(
+            sock.user?.id || ""
+        );
+    const quotedSender =
+        normalizeJid(
+            ext.contextInfo.participantAlt ||
+            ext.contextInfo.participant ||
+            ""
+        );
+
+    if (
+        ownerJid !== quotedSender
+    ) {
+        return;
+    }
+
+    const customerText =
+        (ext.text || "")
+            .toLowerCase()
+            .trim();
+
+    if (
+        !/\bmau\b/i.test(customerText)
+    ) {
+        return;
+    }
+
+    const exists =
+        await orderExists(
+            userId,
+            msg.key.id
+        );
+
+    if (exists) {
+        return;
+    }
+
+    const imageMessage =
+        ext.contextInfo
+            .quotedMessage
+            .imageMessage;
+    const imageMsgID =
+        ext.contextInfo.stanzaId ||
+        msg.key.id;
+    const caption =
+        imageMessage.caption || "";
+    const lines =
+        caption.split("\n");
+    const produk =
+        lines[0]?.trim() || "";
+    const harga =
+        parseHarga(lines[1] || "");
+    const qtyMatch =
+        ext.text?.match(/(\d+)/);
+    const qty =
+        qtyMatch
+            ? parseInt(
+                qtyMatch[1],
+                10
+            )
+            : 1;
+    const subtotal =
+        harga * qty;
+    const nohp =
+        normalizeJid(
+            msg.key.participantAlt ||
+            msg.key.participant ||
+            ""
+        );
+    const photoPath =
+        await saveQuotedImage({
+            sock,
+            imageMessage,
+            fileName:
+                `product_${userId}_${imageMsgID}.jpg`
         });
-        setSocket(sock);
 
-        sock.ev.on(
-            "creds.update",
-            saveCreds
-        );
-
-        const orderState =
-        require("./orderState");
-
-        sock.ev.on(
-            "messages.upsert",
-            async ({ messages }) => {
-
-                try {
-
-                    const msg =
-                        messages[0];
-
-                    if (!msg)
-                        return;
-
-                    //membaca group tertentu
-                    const chatId =
-                        msg.key.remoteJid;
-
-                    if (
-                        !ALLOWED_GROUPS.includes(
-                            chatId
-                        )
-                    ) {
-                        return;
-                    }
-
-                    const ext =
-                        msg.message?.extendedTextMessage;
-
-                   if (
-                        ext?.contextInfo?.quotedMessage?.imageMessage
-                    ) {
-
-                        const imageMessage =
-                        ext.contextInfo
-                            .quotedMessage
-                            .imageMessage;
-
-                        const quotedSender =
-                            ext.contextInfo.participantAlt ||
-                            ext.contextInfo.participant;
-
-                        console.log(
-                            "Quoted Sender:",
-                            quotedSender
-                        );
-
-                        if (
-                            !ADMINS.includes(
-                                quotedSender
-                            )
-                        ) {
-
-                            console.log(
-                                "⛔ Bukan gambar admin"
-                            );
-
-                            return;
-
-                        }
-
-                        const imageData =
-                            JSON.stringify(
-                                imageMessage
-                            );
-                        console.log(
-                            "Image loaded from DB"
-                        );
-
-                        const imageMsgID =
-                            ext.contextInfo
-                                .stanzaId;
-
-                        const fileName =
-                            `product_${imageMsgID}.jpg`;
-
-                        const photoPath =
-                            `/uploads/${fileName}`;
-
-                        const savePath =
-                            path.join(
-                                __dirname,
-                                "../public/uploads",
-                                fileName
-                            );
-
-                        if (
-                            !fs.existsSync(
-                                savePath
-                            )
-                        ) {
-
-                            console.log(
-                                "📥 Download foto produk..."
-                            );
-
-                        }
-                        const buffer =
-                                await downloadMediaMessage(
-                                    {
-                                        message: {
-                                            imageMessage
-                                        }
-                                    },
-                                    "buffer",
-                                    {},
-                                    {
-                                        logger: P({
-                                            level: "silent"
-                                        }),
-                                        reuploadRequest:
-                                            sock.updateMediaMessage
-                                    }
-                                );
-
-                            fs.writeFileSync(
-                                savePath,
-                                buffer
-                            );
-
-                            console.log(
-                                "✅ Foto produk disimpan:",
-                                savePath
-                            );
-
-                       
-
-                        const directPath =
-                            imageMessage.directPath;
-
-                        const mediaKey =
-                            Buffer
-                                .from(imageMessage.mediaKey)
-                                .toString("base64");
-
-                        const caption =
-                            ext.contextInfo
-                                .quotedMessage
-                                .imageMessage
-                                .caption || "";
-
-                        const lines =
-                            caption.split("\n");
-
-                        const produk =
-                            lines[0]?.trim() || "";
-
-                        let harga = 0;
-
-                        const hargaText =
-                            lines[1]
-                                ?.toLowerCase()
-                                .replace(/k/g, "")
-                                .replace(/\s+/g, "")
-                                || "";
-
-                        if (
-                            hargaText.includes("+")
-                        ) {
-
-                            const parts =
-                                hargaText.split("+");
-
-                                    harga =
-                                        parts.reduce(
-                                            (sum, item) =>
-                                                sum + parseInt(item || 0),
-                                            0
-                                        ) * 1000;
-
-                                }
-                                else {
-
-                                    harga =
-                                        parseInt(
-                                            hargaText || 0
-                                        ) * 1000;
-
-                                }
-
-                                console.log(
-                                    "Produk:",
-                                    produk,
-                                    "Harga:",
-                                    harga
-                                );
-
-                        let qty = 1;
-
-                        const qtyMatch =
-                            ext.text?.match(
-                                /(\d+)/
-                            );
-
-                        if (qtyMatch) {
-
-                            qty =
-                                parseInt(
-                                    qtyMatch[1]
-                                );
-
-                        }
-
-                        const subtotal =
-                            harga * qty;
-
-                        const nohp =
-                            (
-                                msg.key.participantAlt ||
-                                ""
-                            )
-                                .replace(
-                                    "@s.whatsapp.net",
-                                    ""
-                                );
-                        const exists =
-                            await orderExists(
-                                msg.key.id
-                            );
-
-                        if (exists) {
-
-                            console.log(
-                                "⚠️ Order sudah ada"
-                            );
-
-                            return;
-
-                        }
-                        const customerText =
-                            (ext.text || "")
-                                .toLowerCase()
-                                .trim();
-
-                        const isOrder =
-                        /\bmau\b/i.test(
-                            customerText
-                        );
-
-                        if (!isOrder) {
-
-                            console.log(
-                                "⛔ Bukan order"
-                            );
-
-                            return;
-
-                        }
-
-                        await saveOrder({
-
-                            lid:
-                                msg.key.participant,
-
-                            nohp,
-
-                            nama:
-                                msg.pushName,
-
-                            produk,
-
-                            harga,
-
-                            qty,
-
-                            subtotal,
-
-                            pesan:
-                                ext.text,
-
-                            customerMsgID:
-                                msg.key.id,
-
-                            imageMsgID:
-                                ext.contextInfo
-                                    .stanzaId,
-                            directPath,
-
-                            mediaKey,
-
-                            imageData,
-                            photoPath
-
-                        });
-
-                        console.log(
-                            "📝 Draft Order Saved"
-                        );
-
-                    }
-
-                } catch (err) {
-
-                    console.log(
-                        err
-                    );
-
-                }
-
-            }
-        );
-
-       sock.ev.on(
-            "messages.reaction",
-            async (reactions) => {
-
-                try {
-
-
-                    const reaction =
-                        reactions[0];
-
-                     const groupId =
-                            reaction.key.remoteJid;
-
-                        if (
-                            !ALLOWED_GROUPS.includes(
-                                groupId
-                            )
-                        ) {
-
-                            // console.log(
-                            //     "⛔ Group tidak diizinkan:",
-                            //     groupId
-                            // );
-
-                            return;
-
-                        }
-
-                    if (!reaction)
-                        return;
-                    console.dir(
-                        reaction,
-                        { depth: null }
-                    );
-                    const emoji =
-                        reaction.reaction?.text;
-
-                    if (
-                        emoji !== "✅"
+    await saveOrder({
+        userId,
+        lid:
+            msg.key.participant ||
+            msg.key.participantAlt ||
+            null,
+        nohp,
+        nama:
+            msg.pushName || nohp,
+        produk,
+        harga,
+        qty,
+        subtotal,
+        pesan: ext.text,
+        customerMsgID:
+            msg.key.id,
+        imageMsgID,
+        directPath:
+            imageMessage.directPath || null,
+        mediaKey:
+            imageMessage.mediaKey
+                ? Buffer
+                    .from(
+                        imageMessage.mediaKey
                     )
-                        return;
-                    
-                    const sender =
-                        reaction.reaction.key.participantAlt;
+                    .toString("base64")
+                : null,
+        imageData:
+            JSON.stringify(
+                imageMessage
+            ),
+        photoPath
+    });
 
-                    console.log(
-                        "Reaction by:",
-                        sender
-                    );
+}
 
-                    // if (
-                    //     !ADMINS.includes(sender)
-                    // ) {
+async function handleReactionApproval({
+    sock,
+    userId,
+    reaction
+}) {
 
-                    //     console.log(
-                    //         "⛔ Bukan admin"
-                    //     );
+    const groupId =
+        reaction.key.remoteJid || "";
 
-                    //     return;
+    if (
+        !groupId.endsWith("@g.us")
+    ) {
+        return;
+    }
 
-                    // }
-
-                    const customerMsgID =
-                        reaction.key.id;
-
-                    const order =
-                        await getOrderByCustomerMsgID(
-                            customerMsgID
-                        );
-
-                    if (!order) {
-
-                        console.log(
-                            "Order tidak ditemukan"
-                        );
-
-                        return;
-
-                    }
-                    console.log(
-                        "Order ditemukan:",
-                        order.id
-                    );  
-                    const imageMessage =
-                    JSON.parse(
-                        order.image_data
-                    );
-
-                    const fileName =
-                        `order_${order.id}.jpg`;
-
-                    const savePath =
-                        path.join(
-                            __dirname,
-                            "../public/uploads",
-                            fileName
-                        );
-                    console.log(
-                        "Image data loaded"
-                    );
-                    const buffer =
-                    await downloadMediaMessage(
-                        {
-                            message: {
-                                imageMessage
-                            }
-                        },
-                        "buffer",
-                        {},
-                        {
-                            logger: P({
-                                level: "silent"
-                            }),
-                            reuploadRequest:
-                                sock.updateMediaMessage
-                        }
-                    );
-
-                    console.log(
-                        "Buffer size:",
-                        buffer.length
-                    );
-                    fs.writeFileSync(
-                        savePath,
-                        buffer
-                    );
-
-                    console.log(
-                        "📸 Foto tersimpan:",
-                        savePath
-                    );
-
-                    console.dir(
-                        imageMessage,
-                        { depth: null }
-                    );
-
-                    console.log(
-                        "✅ APPROVED:",
-                        customerMsgID
-                    );
-
-                    await approveOrder(
-                        customerMsgID
-                    );
-
-                    console.log(
-                        "📝 Order Updated"
-                    );
-
-                } catch (err) {
-
-                    console.log(err);
-
-                }
-
-            }
+    const allowed =
+        await isAllowedGroup(
+            userId,
+            groupId
         );
 
-        sock.ev.on(
-            "connection.update",
-            async (update) => {
+    if (!allowed) {
+        return;
+    }
 
-                console.log(
-                    "UPDATE:",
-                    update
+    if (
+        reaction.reaction?.text !==
+        "✅"
+    ) {
+        return;
+    }
+
+    const sender =
+        normalizeJid(
+            reaction.reaction?.key?.participantAlt ||
+            reaction.reaction?.key?.participant ||
+            ""
+        );
+    const ownerJid =
+        normalizeJid(
+            sock.user?.id || ""
+        );
+
+    if (sender !== ownerJid) {
+        return;
+    }
+
+    const customerMsgID =
+        reaction.key.id;
+    const order =
+        await getOrderByCustomerMsgID(
+            userId,
+            customerMsgID
+        );
+
+    if (!order) {
+        return;
+    }
+
+    await approveOrder(
+        userId,
+        customerMsgID
+    );
+
+}
+
+async function ensureWhatsAppSession(
+    user
+) {
+
+    const userId = user.id;
+
+    if (
+        startPromises.has(userId)
+    ) {
+        return startPromises.get(userId);
+    }
+
+    const existingSocket =
+        getSocket(userId);
+    const existingState =
+        getState(userId);
+
+    if (
+        existingSocket &&
+        (
+            existingState.connected ||
+            existingState.isStarting
+        )
+    ) {
+        return existingSocket;
+    }
+
+    const startPromise =
+        (async () => {
+            try {
+                const authDir =
+                    getAuthDir(userId);
+
+                fs.mkdirSync(
+                    authDir,
+                    { recursive: true }
+                );
+
+                setState(
+                    userId,
+                    {
+                        isStarting: true
+                    }
                 );
 
                 const {
-                    connection,
-                    lastDisconnect,
-                    qr
-                } = update;
-
-                if (qr) {
-
-                    console.log(
-                        "📱 QR Generated"
+                    state: authState,
+                    saveCreds
+                } =
+                    await useMultiFileAuthState(
+                        authDir
                     );
+                const {
+                    version
+                } =
+                    await fetchLatestBaileysVersion();
 
-                    state.qr = qr;
-                }
+                const sock =
+                    makeWASocket({
+                        version,
+                        auth: authState,
+                        logger: P({
+                            level: "silent"
+                        })
+                    });
 
-                if (
-                    connection === "open"
-                ) {
+                setSocket(
+                    userId,
+                    sock
+                );
 
-                    console.log(
-                        "✅ WhatsApp Connected"
-                    );
+                sock.ev.on(
+                    "creds.update",
+                    saveCreds
+                );
 
-                    state.connected = true;
-                    state.qr = null;
-                    state.phone = sock.user?.id || null;
-                    state.lastConnected = new Date();
+                sock.ev.on(
+                    "messages.upsert",
+                    async ({ messages }) => {
+                        try {
+                            const msg =
+                                messages[0];
 
-                    const groups =
-                        await sock.groupFetchAllParticipating();
+                            if (!msg) {
+                                return;
+                            }
 
-                    // console.log(
-                    //     "\n===== GROUP LIST =====\n"
-                    // );
-
-                    // Object.values(groups).forEach(
-                    //     group => {
-
-                    //         console.log(
-                    //             `${group.subject} => ${group.id}`
-                    //         );
-
-                    //     }
-                    // );
-
-                }
-
-                if (
-                    connection === "close"
-                ) {
-
-                    console.log(
-                        "❌ WhatsApp Disconnected"
-                    );
-
-                    console.dir(
-                        lastDisconnect,
-                        { depth: null }
-                    );
-
-                    state.connected = false;
-                    state.phone = null;
-
-                    const shouldReconnect =
-                        lastDisconnect?.error?.output?.statusCode !==
-                        DisconnectReason.loggedOut;
-
-                    if (
-                        shouldReconnect
-                    ) {
-
-                        console.log(
-                            "🔄 Reconnect in 5 sec..."
-                        );
-
-                        setTimeout(
-                            () => {
-                                startWhatsApp();
-                            },
-                            5000
-                        );
-
+                            await handleIncomingOrder({
+                                sock,
+                                userId,
+                                msg
+                            });
+                        } catch (err) {
+                            console.log(err);
+                        }
                     }
+                );
 
-                }
+                sock.ev.on(
+                    "messages.reaction",
+                    async reactions => {
+                        try {
+                            const reaction =
+                                reactions[0];
 
+                            if (!reaction) {
+                                return;
+                            }
+
+                            await handleReactionApproval({
+                                sock,
+                                userId,
+                                reaction
+                            });
+                        } catch (err) {
+                            console.log(err);
+                        }
+                    }
+                );
+
+                sock.ev.on(
+                    "connection.update",
+                    update => {
+                        const {
+                            connection,
+                            lastDisconnect,
+                            qr
+                        } = update;
+
+                        if (qr) {
+                            setState(
+                                userId,
+                                {
+                                    qr,
+                                    connected: false
+                                }
+                            );
+                        }
+
+                        if (
+                            connection === "open"
+                        ) {
+                            setState(
+                                userId,
+                                {
+                                    connected: true,
+                                    qr: null,
+                                    phone:
+                                        sock.user?.id ||
+                                        null,
+                                    lastConnected:
+                                        new Date(),
+                                    isStarting: false
+                                }
+                            );
+                        }
+
+                        if (
+                            connection === "close"
+                        ) {
+                            removeSocket(userId);
+                            setState(
+                                userId,
+                                {
+                                    connected: false,
+                                    phone: null,
+                                    qr: null,
+                                    isStarting: false
+                                }
+                            );
+
+                            const shouldReconnect =
+                                lastDisconnect?.error?.output?.statusCode !==
+                                DisconnectReason.loggedOut;
+
+                            if (
+                                shouldReconnect
+                            ) {
+                                setTimeout(
+                                    () => {
+                                        ensureWhatsAppSession(
+                                            user
+                                        ).catch(
+                                            err => {
+                                                console.log(
+                                                    err
+                                                );
+                                            }
+                                        );
+                                    },
+                                    5000
+                                );
+                            }
+                        }
+                    }
+                );
+
+                return sock;
+            } catch (err) {
+                removeSocket(userId);
+                setState(
+                    userId,
+                    {
+                        connected: false,
+                        qr: null,
+                        isStarting: false
+                    }
+                );
+                throw err;
+            } finally {
+                setState(
+                    userId,
+                    {
+                        isStarting: false
+                    }
+                );
+                startPromises.delete(
+                    userId
+                );
             }
+        })();
+
+    startPromises.set(
+        userId,
+        startPromise
+    );
+
+    return startPromise;
+
+}
+
+function getWhatsAppState(
+    userId
+) {
+
+    return getState(userId);
+
+}
+
+async function bootstrapWhatsAppSessions() {
+
+    const [users] =
+        await pool.query(
+            `
+            SELECT
+                id,
+                email,
+                display_name
+            FROM users
+            ORDER BY id ASC
+            `
         );
 
-        return sock;
-
-    } catch (err) {
-
-        console.log(
-            "❌ WhatsApp Startup Error"
-        );
-
-        console.error(err);
-
+    for (const user of users) {
+        if (
+            hasWhatsAppAuth(user.id)
+        ) {
+            ensureWhatsAppSession({
+                id: user.id,
+                email: user.email,
+                displayName:
+                    user.display_name
+            }).catch(err => {
+                console.log(err);
+            });
+        }
     }
 
 }
 
-module.exports =
-    startWhatsApp;
+module.exports = {
+    ensureWhatsAppSession,
+    getWhatsAppState,
+    bootstrapWhatsAppSessions,
+    hasWhatsAppAuth
+};

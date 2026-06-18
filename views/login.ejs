@@ -1,0 +1,66 @@
+<%
+const errorMessages = {
+    login_failed: "Login Google gagal. Silakan coba lagi."
+};
+
+const message =
+    errorMessages[error] ||
+    "";
+%>
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1">
+    <title><%= pageTitle || "Login" %> - Jastiper</title>
+    <link
+        href="/tabler/dist/css/tabler.min.css"
+        rel="stylesheet">
+</head>
+<body class="d-flex flex-column bg-light">
+    <div class="page page-center">
+        <div class="container container-tight py-4">
+            <div class="text-center mb-4">
+                <h1 class="navbar-brand navbar-brand-autodark m-0">
+                    Nitip.MamaZZ
+                </h1>
+                <div class="text-secondary mt-2">
+                    Admin Panel Login
+                </div>
+            </div>
+
+            <div class="card card-md">
+                <div class="card-body">
+                    <h2 class="h2 text-center mb-4">
+                        Masuk dengan Google
+                    </h2>
+
+                    <p class="text-secondary text-center mb-4">
+                        Setiap akun Google memiliki data dashboard dan koneksi WhatsApp masing-masing.
+                    </p>
+
+                    <% if(message){ %>
+                        <div class="alert alert-danger" role="alert">
+                            <%= message %>
+                        </div>
+                    <% } %>
+
+                    <a
+                        href="/auth/google"
+                        class="btn btn-danger w-100">
+                        Login dengan Google
+                    </a>
+                </div>
+            </div>
+
+            <div class="text-center text-secondary mt-3">
+                Setelah login berhasil, Anda akan diarahkan ke dashboard.
+            </div>
+        </div>
+    </div>
+
+    <script src="/tabler/dist/js/tabler.min.js"></script>
+</body>
+</html>

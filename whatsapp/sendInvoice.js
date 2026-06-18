@@ -17,12 +17,13 @@ function formatRupiah(
 }
 
 async function sendInvoiceWA(
+    userId,
     invoice,
     items
 ) {
 
     const sock =
-        getSocket();
+        getSocket(userId);
 
     if (!sock) {
 

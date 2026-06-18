@@ -2,7 +2,8 @@ const pool =
     require("../database/db");
 
 async function generateInvoice(
-    nohp
+    nohp,
+    userId
 ) {
 
     const [orders] =
@@ -10,11 +11,15 @@ async function generateInvoice(
             `
             SELECT *
             FROM orders
-            WHERE nohp = ?
+            WHERE user_id = ?
+            AND nohp = ?
             AND status='approved'
             AND invoice_no IS NULL
             `,
-            [nohp]
+            [
+                userId,
+                nohp
+            ]
         );
 
     if (
@@ -55,6 +60,7 @@ async function generateInvoice(
         `
         INSERT INTO invoices
         (
+            user_id,
             invoice_no,
             nohp,
             nama,
@@ -64,10 +70,11 @@ async function generateInvoice(
         )
         VALUES
         (
-            ?,?,?,?,?,?
+            ?,?,?,?,?,?,?
         )
         `,
         [
+            userId,
             invoiceNo,
             orders[0].nohp,
             orders[0].nama,
@@ -86,6 +93,7 @@ async function generateInvoice(
             `
             INSERT INTO invoice_items
             (
+                user_id,
                 invoice_no,
                 produk,
                 harga,
@@ -94,10 +102,11 @@ async function generateInvoice(
             )
             VALUES
             (
-                ?,?,?,?,?
+                ?,?,?,?,?,?
             )
             `,
             [
+                userId,
                 invoiceNo,
                 order.produk,
                 order.harga,
@@ -112,12 +121,14 @@ async function generateInvoice(
         `
         UPDATE orders
         SET invoice_no=?
-        WHERE nohp=?
+        WHERE user_id=?
+        AND nohp=?
         AND status='approved'
         AND invoice_no IS NULL
         `,
         [
             invoiceNo,
+            userId,
             nohp
         ]
     );

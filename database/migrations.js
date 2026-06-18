@@ -41,6 +41,12 @@ async function runMigrations() {
 
         await addColumnIfNotExists(
             "orders",
+            "user_id",
+            "BIGINT"
+        );
+
+        await addColumnIfNotExists(
+            "orders",
             "customer_msg_id",
             "VARCHAR(255)"
         );
@@ -70,8 +76,38 @@ async function runMigrations() {
         );
         await addColumnIfNotExists(
             "invoices",
+            "user_id",
+            "BIGINT"
+        );
+
+        await addColumnIfNotExists(
+            "invoices",
             "wa_sent",
             "TINYINT(1) DEFAULT 0"
+        );
+
+        await addColumnIfNotExists(
+            "invoice_items",
+            "user_id",
+            "BIGINT"
+        );
+
+        await addColumnIfNotExists(
+            "whatsapp_groups",
+            "user_id",
+            "BIGINT"
+        );
+
+        await addColumnIfNotExists(
+            "customers",
+            "user_id",
+            "BIGINT"
+        );
+
+        await addColumnIfNotExists(
+            "settings",
+            "user_id",
+            "BIGINT"
         );
 
         console.log(

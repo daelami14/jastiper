@@ -2,12 +2,24 @@ require("dotenv").config();
 
 const initDatabase =
     require("./database/init");
-
-const startWhatsApp =
-    require("./whatsapp/baileys");
+const pool =
+    require("./database/db");
+const {
+    ensureWhatsAppSession,
+    getWhatsAppState,
+    bootstrapWhatsAppSessions
+} = require("./whatsapp/baileys");
 
 const express =
     require("express");
+const session =
+    require("express-session");
+const passport =
+    require("passport");
+const GoogleStrategy =
+    require(
+        "passport-google-oauth20"
+    ).Strategy;
 
 const {
     generateInvoice
@@ -53,6 +65,101 @@ app.use(
 app.use(
     express.json()
 );
+
+app.use(
+    session({
+        secret:
+            process.env.SESSION_SECRET ||
+            "jastiper-google-login",
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+            secure: false,
+            maxAge:
+                1000 * 60 * 60 * 24
+        }
+    })
+);
+
+app.use(
+    passport.initialize()
+);
+app.use(
+    passport.session()
+);
+
+function mapUserRow(user) {
+
+    if (!user) {
+        return null;
+    }
+
+    return {
+        id: user.id,
+        googleId:
+            user.google_id,
+        email: user.email,
+        displayName:
+            user.display_name,
+        photo:
+            user.photo_url || ""
+    };
+
+}
+
+async function upsertGoogleUser(
+    profile
+) {
+
+    const email =
+        profile.emails?.[0]?.value || "";
+
+    if (!email) {
+        return null;
+    }
+
+    await pool.query(
+        `
+        INSERT INTO users
+        (
+            google_id,
+            email,
+            display_name,
+            photo_url
+        )
+        VALUES
+        (
+            ?,?,?,?
+        )
+        ON DUPLICATE KEY UPDATE
+            email = VALUES(email),
+            display_name = VALUES(display_name),
+            photo_url = VALUES(photo_url)
+        `,
+        [
+            profile.id,
+            email,
+            profile.displayName ||
+                email,
+            profile.photos?.[0]?.value ||
+                ""
+        ]
+    );
+
+    const [[user]] =
+        await pool.query(
+            `
+            SELECT *
+            FROM users
+            WHERE google_id = ?
+            LIMIT 1
+            `,
+            [profile.id]
+        );
+
+    return mapUserRow(user);
+
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -108,6 +215,190 @@ app.use(
             "uploads"
         )
     )
+);
+
+passport.serializeUser(
+    (user, done) =>
+        done(null, user.id)
+);
+passport.deserializeUser(
+    async (userId, done) => {
+        try {
+            const [[user]] =
+                await pool.query(
+                    `
+                    SELECT *
+                    FROM users
+                    WHERE id = ?
+                    LIMIT 1
+                    `,
+                    [userId]
+                );
+
+            done(
+                null,
+                mapUserRow(user)
+            );
+        } catch (err) {
+            done(err);
+        }
+    }
+);
+
+passport.use(
+    new GoogleStrategy(
+        {
+            clientID:
+                process.env.GOOGLE_CLIENT_ID,
+            clientSecret:
+                process.env.GOOGLE_CLIENT_SECRET,
+            callbackURL:
+                process.env.GOOGLE_CALLBACK_URL
+        },
+        async (
+            accessToken,
+            refreshToken,
+            profile,
+            done
+        ) => {
+            try {
+                const user =
+                    await upsertGoogleUser(
+                        profile
+                    );
+
+                return done(
+                    null,
+                    user
+                );
+            } catch (err) {
+                return done(err);
+            }
+        }
+    )
+);
+
+function getUserId(req) {
+
+    return req.user.id;
+
+}
+
+app.use(
+    (req, res, next) => {
+        res.locals.currentUser =
+            req.user || null;
+        next();
+    }
+);
+
+app.get(
+    "/login",
+    (req, res) => {
+        if(
+            req.isAuthenticated &&
+            req.isAuthenticated()
+        ) {
+            return res.redirect("/");
+        }
+
+        res.render(
+            "login",
+            {
+                layout: false,
+                pageTitle: "Login",
+                error:
+                    req.query.error || ""
+            }
+        );
+    }
+);
+
+app.get(
+    "/auth/google",
+    passport.authenticate(
+        "google",
+        {
+            scope: ["profile", "email"],
+            prompt: "select_account"
+        }
+    )
+);
+
+app.get(
+    "/auth/google/callback",
+    (req, res, next) => {
+        passport.authenticate(
+            "google",
+            (err, user) => {
+                if(err){
+                    return next(err);
+                }
+
+                if(!user){
+                    return res.redirect(
+                        "/login?error=login_failed"
+                    );
+                }
+
+                req.logIn(
+                    user,
+                    loginErr => {
+                        if(loginErr){
+                            return next(loginErr);
+                        }
+
+                        ensureWhatsAppSession(
+                            user
+                        ).catch(err => {
+                            console.log(err);
+                        });
+
+                        return res.redirect("/");
+                    }
+                );
+            }
+        )(req, res, next);
+    }
+);
+
+app.use(
+    (req, res, next) => {
+        const publicPaths = [
+            "/login",
+            "/auth/google",
+            "/auth/google/callback"
+        ];
+
+        if(publicPaths.includes(req.path)){
+            return next();
+        }
+
+        if(
+            req.isAuthenticated &&
+            req.isAuthenticated()
+        ) {
+            return next();
+        }
+
+        return res.redirect("/login");
+    }
+);
+
+app.get(
+    "/logout",
+    (req, res, next) => {
+        req.logout(err => {
+            if(err){
+                return next(err);
+            }
+
+            req.session.destroy(() => {
+                res.clearCookie("connect.sid");
+                res.redirect("/login");
+            });
+        });
+    }
 );
 
 /*
@@ -219,50 +510,66 @@ app.use(
 app.get(
     "/",
     async (req,res) => {
-
-        const pool =
-            require("./database/db");
+        const userId =
+            getUserId(req);
 
         const {
             startDate = "",
             endDate = ""
         } = req.query;
 
-        const dateParams = [];
-        const dateConditions = [];
+        const orderConditions = [
+            "user_id = ?"
+        ];
+        const orderParams = [userId];
+        const invoiceConditions = [
+            "user_id = ?"
+        ];
+        const invoiceParams = [userId];
+        const paidInvoiceConditions = [
+            "user_id = ?",
+            "status='paid'"
+        ];
+        const paidInvoiceParams = [userId];
 
         if(startDate){
-            dateConditions.push(
+            orderConditions.push(
                 "DATE(created_at) >= ?"
             );
-            dateParams.push(startDate);
+            orderParams.push(startDate);
+            invoiceConditions.push(
+                "DATE(created_at) >= ?"
+            );
+            invoiceParams.push(startDate);
+            paidInvoiceConditions.push(
+                "DATE(created_at) >= ?"
+            );
+            paidInvoiceParams.push(startDate);
         }
 
         if(endDate){
-            dateConditions.push(
+            orderConditions.push(
                 "DATE(created_at) <= ?"
             );
-            dateParams.push(endDate);
+            orderParams.push(endDate);
+            invoiceConditions.push(
+                "DATE(created_at) <= ?"
+            );
+            invoiceParams.push(endDate);
+            paidInvoiceConditions.push(
+                "DATE(created_at) <= ?"
+            );
+            paidInvoiceParams.push(endDate);
         }
 
         const orderWhereSql =
-            dateConditions.length
-                ? `WHERE ${dateConditions.join(" AND ")}`
-                : "";
+            `WHERE ${orderConditions.join(" AND ")}`;
 
         const invoiceWhereSql =
-            dateConditions.length
-                ? `WHERE ${dateConditions.join(" AND ")}`
-                : "";
+            `WHERE ${invoiceConditions.join(" AND ")}`;
 
         const paidInvoiceWhereSql =
-            ["status='paid'", ...dateConditions]
-                .length
-                    ? `WHERE ${[
-                        "status='paid'",
-                        ...dateConditions
-                    ].join(" AND ")}`
-                    : "";
+            `WHERE ${paidInvoiceConditions.join(" AND ")}`;
 
         const chartLimitSql =
             startDate || endDate
@@ -275,7 +582,7 @@ app.get(
                     COUNT(*) total_order
                 FROM orders
                 ${orderWhereSql}
-            `, dateParams);
+            `, orderParams);
 
         const [[customerStat]] =
             await pool.query(`
@@ -284,7 +591,7 @@ app.get(
                     total_customer
                 FROM orders
                 ${orderWhereSql}
-            `, dateParams);
+            `, orderParams);
 
         const [[invoiceStat]] =
             await pool.query(`
@@ -292,7 +599,7 @@ app.get(
                     COUNT(*) total_invoice
                 FROM invoices
                 ${invoiceWhereSql}
-            `, dateParams);
+            `, invoiceParams);
 
         const [[revenueStat]] =
             await pool.query(`
@@ -303,7 +610,7 @@ app.get(
                     ) revenue
                 FROM invoices
                 ${paidInvoiceWhereSql}
-            `, dateParams);
+            `, paidInvoiceParams);
 
         const [topProducts] =
             await pool.query(`
@@ -315,7 +622,7 @@ app.get(
                 GROUP BY produk
                 ORDER BY total_qty DESC
                 LIMIT 10
-            `, dateParams);
+            `, orderParams);
 
         const [topCustomers] =
             await pool.query(`
@@ -329,7 +636,7 @@ app.get(
                 GROUP BY nohp
                 ORDER BY total_belanja DESC
                 LIMIT 10
-            `, dateParams);
+            `, orderParams);
 
         const [dailyOrders] =
         await pool.query(`
@@ -348,7 +655,7 @@ app.get(
             ORDER BY tanggal ASC
 
             ${chartLimitSql}
-        `, dateParams);
+        `, orderParams);
 
         const [dailyRevenue] =
         await pool.query(`
@@ -367,7 +674,7 @@ app.get(
             ORDER BY tanggal ASC
 
             ${chartLimitSql}
-        `, dateParams);
+        `, paidInvoiceParams);
 
         res.render(
             "dashboard",
@@ -404,9 +711,8 @@ app.get(
 app.get(
     "/interest-orders",
     async (req, res) => {
-
-        const pool =
-            require("./database/db");
+        const userId =
+            getUserId(req);
 
        const [products] =
         await pool.query(`
@@ -424,12 +730,13 @@ app.get(
 
             FROM orders
 
-            WHERE status='draft'
+            WHERE user_id = ?
+            AND status='draft'
 
             GROUP BY image_msg_id
 
             ORDER BY MAX(created_at) DESC
-        `);
+        `, [userId]);
 
         res.render(
             "interest-orders",
@@ -454,9 +761,8 @@ app.get(
 app.get(
     "/interest-orders/:imageMsgId",
     async (req, res) => {
-
-        const pool =
-            require("./database/db");
+        const userId =
+            getUserId(req);
 
         const imageMsgId =
             req.params.imageMsgId;
@@ -466,11 +772,15 @@ app.get(
                 `
                 SELECT *
                 FROM orders
-                WHERE image_msg_id = ?
+                WHERE user_id = ?
+                AND image_msg_id = ?
                 AND status='draft'
                 ORDER BY id DESC
                 `,
-                [imageMsgId]
+                [
+                    userId,
+                    imageMsgId
+                ]
             );
 
         const [[summary]] =
@@ -481,10 +791,14 @@ app.get(
                     SUM(qty) AS total_qty,
                     SUM(subtotal) AS total_nominal
                 FROM orders
-                WHERE image_msg_id = ?
+                WHERE user_id = ?
+                AND image_msg_id = ?
                 AND status='draft'
                 `,
-                [imageMsgId]
+                [
+                    userId,
+                    imageMsgId
+                ]
             );
 
         if (
@@ -526,9 +840,8 @@ app.post(
     async (req, res) => {
 
         try {
-
-            const pool =
-                require("./database/db");
+            const userId =
+                getUserId(req);
 
             const ids =
                 req.body.ids || [];
@@ -538,22 +851,30 @@ app.post(
                     `
                     SELECT *
                     FROM orders
-                    WHERE id IN (?)
+                    WHERE user_id = ?
+                    AND id IN (?)
                     `,
-                    [ids]
+                    [
+                        userId,
+                        ids
+                    ]
                 );
 
             await pool.query(
                 `
                 UPDATE orders
                 SET status='approved'
-                WHERE id IN (?)
+                WHERE user_id = ?
+                AND id IN (?)
                 `,
-                [ids]
+                [
+                    userId,
+                    ids
+                ]
             );
 
             const sock =
-                getSocket();
+                getSocket(userId);
 
             for (
                 const order
@@ -562,10 +883,11 @@ app.post(
 
                 try {
 
-                    await sock.sendMessage(
-                        `${order.nohp}@s.whatsapp.net`,
-                        {
-                            text:
+                    if (sock) {
+                        await sock.sendMessage(
+                            `${order.nohp}@s.whatsapp.net`,
+                            {
+                                text:
 `Halo ${order.nama} 👋
 
 Pesanan Anda telah disetujui.
@@ -576,8 +898,9 @@ Qty : ${order.qty}
 Silakan tunggu invoice dari admin.
 
 Terima kasih 🙏`
-                        }
-                    );
+                            }
+                        );
+                    }
 
                 } catch (err) {
 
@@ -611,9 +934,8 @@ Terima kasih 🙏`
 app.get(
     "/orders",
     async (req, res) => {
-
-        const pool =
-            require("./database/db");
+        const userId =
+            getUserId(req);
 
         const [orders] =
             await pool.query(`
@@ -635,12 +957,14 @@ app.get(
 
             FROM orders
 
-            WHERE status='approved' and invoice_no is null
+            WHERE user_id = ?
+            AND status='approved'
+            AND invoice_no is null
 
             GROUP BY lid
 
             ORDER BY MAX(created_at) DESC
-            `);
+            `, [userId]);
 
         res.render(
             "orders",
@@ -698,9 +1022,8 @@ app.get(
 app.get(
     "/orders/:nohp",
     async (req,res) => {
-
-        const pool =
-            require("./database/db");
+        const userId =
+            getUserId(req);
 
         const nohp =
             req.params.nohp;
@@ -710,12 +1033,16 @@ app.get(
                 `
                 SELECT *
                 FROM orders
-                WHERE nohp=?
+                WHERE user_id = ?
+                AND nohp=?
                 AND status='approved' 
                 AND invoice_no is null
                 ORDER BY id DESC
                 `,
-                [nohp]
+                [
+                    userId,
+                    nohp
+                ]
             );
 
         const [[summary]] =
@@ -731,11 +1058,15 @@ app.get(
 
                 FROM orders
 
-                WHERE nohp=?
+                WHERE user_id = ?
+                AND nohp=?
                 AND status='approved' 
                 AND invoice_no is null
                 `,
-                [nohp]
+                [
+                    userId,
+                    nohp
+                ]
             );
 
         res.render(
@@ -760,16 +1091,16 @@ app.get(
 app.get(
     "/invoices",
     async (req, res) => {
-
-        const pool =
-            require("./database/db");
+        const userId =
+            getUserId(req);
 
         const [invoices] =
             await pool.query(`
                 SELECT *
                 FROM invoices
+                WHERE user_id = ?
                 ORDER BY id DESC
-            `);
+            `, [userId]);
 
         res.render(
             "invoices",
@@ -794,9 +1125,8 @@ app.get(
 app.get(
     "/invoices/:invoiceNo",
     async (req, res) => {
-
-        const pool =
-            require("./database/db");
+        const userId =
+            getUserId(req);
 
         const invoiceNo =
             req.params.invoiceNo;
@@ -806,9 +1136,13 @@ app.get(
                 `
                 SELECT *
                 FROM invoices
-                WHERE invoice_no=?
+                WHERE user_id = ?
+                AND invoice_no=?
                 `,
-                [invoiceNo]
+                [
+                    userId,
+                    invoiceNo
+                ]
             );
 
         if (!invoice) {
@@ -831,12 +1165,17 @@ app.get(
                 FROM invoice_items ii
 
                 LEFT JOIN orders o
-                    ON o.invoice_no = ii.invoice_no
+                    ON o.user_id = ii.user_id
+                    AND o.invoice_no = ii.invoice_no
                     AND o.produk = ii.produk
 
-                WHERE ii.invoice_no = ?
+                WHERE ii.user_id = ?
+                AND ii.invoice_no = ?
                 `,
-                [invoiceNo]
+                [
+                    userId,
+                    invoiceNo
+                ]
             );
             
 
@@ -866,9 +1205,8 @@ app.post(
     async (req, res) => {
 
         try {
-
-            const pool =
-                require("./database/db");
+            const userId =
+                getUserId(req);
 
             const invoiceNo =
                 req.params.invoiceNo;
@@ -878,9 +1216,13 @@ app.post(
                     `
                     SELECT *
                     FROM invoices
-                    WHERE invoice_no=?
+                    WHERE user_id = ?
+                    AND invoice_no=?
                     `,
-                    [invoiceNo]
+                    [
+                        userId,
+                        invoiceNo
+                    ]
                 );
 
             const [items] =
@@ -888,12 +1230,17 @@ app.post(
                     `
                     SELECT *
                     FROM invoice_items
-                    WHERE invoice_no=?
+                    WHERE user_id = ?
+                    AND invoice_no=?
                     `,
-                    [invoiceNo]
+                    [
+                        userId,
+                        invoiceNo
+                    ]
                 );
 
             await sendInvoiceWA(
+                userId,
                 invoice,
                 items
             );
@@ -901,9 +1248,13 @@ app.post(
                 `
                 UPDATE invoices
                 SET wa_sent = 1
-                WHERE invoice_no = ?
+                WHERE user_id = ?
+                AND invoice_no = ?
                 `,
-                [invoiceNo]
+                [
+                    userId,
+                    invoiceNo
+                ]
             );
 
             res.json({
@@ -933,17 +1284,18 @@ app.post(
     async (req, res) => {
 
         try {
-
-            const pool =
-                require("./database/db");
+            const userId =
+                getUserId(req);
 
             await pool.query(
                 `
                 UPDATE invoices
                 SET status='paid'
-                WHERE invoice_no=?
+                WHERE user_id = ?
+                AND invoice_no=?
                 `,
                 [
+                    userId,
                     req.params.invoiceNo
                 ]
             );
@@ -975,6 +1327,8 @@ app.post(
     async (req, res) => {
 
         try {
+            const userId =
+                getUserId(req);
 
             const nohps =
                 req.body.nohps || [];
@@ -989,7 +1343,8 @@ app.post(
 
                 const invoiceNo =
                     await generateInvoice(
-                        nohp
+                        nohp,
+                        userId
                     );
 
                 if (
@@ -1138,123 +1493,23 @@ app.post(
     async (req,res) => {
 
         try{
-
-            const pool =
-                require("./database/db");
+            const userId =
+                getUserId(req);
 
             const nohp =
                 req.params.nohp;
 
-            const [orders] =
-                await pool.query(
-                    `
-                    SELECT *
-                    FROM orders
-                    WHERE nohp=?
-                    AND status='approved'
-                    `,
-                    [nohp]
+            const invoiceNo =
+                await generateInvoice(
+                    nohp,
+                    userId
                 );
 
-            if(
-                orders.length === 0
-            ){
+            if(!invoiceNo){
                 return res.json({
                     success:false
                 });
             }
-
-            const invoiceNo =
-                generateInvoiceNo();
-
-            const nama =
-                orders[0].nama;
-
-            const totalItem =
-                orders.length;
-
-            const totalQty =
-                orders.reduce(
-                    (a,b)=>
-                    a + Number(b.qty),
-                    0
-                );
-
-            const grandTotal =
-                orders.reduce(
-                    (a,b)=>
-                    a + Number(b.subtotal),
-                    0
-                );
-
-            await pool.query(
-                `
-                INSERT INTO invoices
-                (
-                    invoice_no,
-                    nohp,
-                    nama,
-                    total_item,
-                    total_qty,
-                    grand_total,
-                    status
-                )
-                VALUES
-                (
-                    ?,?,?,?,?,?,'unpaid'
-                )
-                `,
-                [
-                    invoiceNo,
-                    nohp,
-                    nama,
-                    totalItem,
-                    totalQty,
-                    grandTotal
-                ]
-            );
-
-            for(
-                const item
-                of orders
-            ){
-
-                await pool.query(
-                    `
-                    INSERT INTO invoice_items
-                    (
-                        invoice_no,
-                        produk,
-                        harga,
-                        qty,
-                        subtotal
-                    )
-                    VALUES
-                    (?,?,?,?,?)
-                    `,
-                    [
-                        invoiceNo,
-                        item.produk,
-                        item.harga,
-                        item.qty,
-                        item.subtotal
-                    ]
-                );
-
-            }
-
-            await pool.query(
-                `
-                UPDATE orders
-                SET invoice_no=?
-                WHERE nohp=?
-                AND status='approved'
-                `,
-                [
-                    invoiceNo,
-                    nohp
-                ]
-            );
 
             res.json({
 
@@ -1283,9 +1538,8 @@ app.post(
 app.get(
     "/customers",
     async (req,res) => {
-
-        const pool =
-            require("./database/db");
+        const userId =
+            getUserId(req);
 
         const [customers] =
             await pool.query(
@@ -1306,10 +1560,14 @@ app.get(
 
                 FROM orders
 
+                WHERE user_id = ?
+
                 GROUP BY nohp
 
                 ORDER BY total_belanja DESC
                 `
+                ,
+                [userId]
             );
 
         res.render(
@@ -1335,9 +1593,8 @@ app.get(
 app.get(
     "/customers/:nohp",
     async (req,res) => {
-
-        const pool =
-            require("./database/db");
+        const userId =
+            getUserId(req);
 
         const nohp =
             req.params.nohp;
@@ -1358,10 +1615,14 @@ app.get(
                 photo_path,
                 created_at
             FROM orders
-            WHERE nohp=?
+            WHERE user_id = ?
+            AND nohp=?
             ORDER BY id DESC
             `,
-            [nohp]
+            [
+                userId,
+                nohp
+            ]
         );
 
         if(
@@ -1400,32 +1661,39 @@ app.get(
 const QRCode =
     require("qrcode");
 
-const whatsappState =
-    require(
-        "./whatsapp/state"
-    );
-
  // WhatsApp Status
 app.get(
     "/whatsapp",
     async (req, res) => {
 
         try {
+            const userId =
+                getUserId(req);
+
+            await ensureWhatsAppSession(
+                req.user
+            );
+
+            const whatsappState =
+                getWhatsAppState(userId);
             const [[orderToday]] =
             await pool.query(`
                 SELECT
                     COUNT(*) total
                 FROM orders
-                WHERE DATE(created_at)=CURDATE()
-            `);
+                WHERE user_id = ?
+                AND DATE(created_at)=CURDATE()
+            `, [userId]);
 
             const [[interestToday]] =
             await pool.query(`
                 SELECT
                     COUNT(*) total
-                FROM interest_orders
-                WHERE DATE(created_at)=CURDATE()
-            `);
+                FROM orders
+                WHERE user_id = ?
+                AND status='draft'
+                AND DATE(created_at)=CURDATE()
+            `, [userId]);
 
             let qrImage = null;
 
@@ -1510,6 +1778,10 @@ app.get(
 app.get(
     "/api/whatsapp",
     (req, res) => {
+        const whatsappState =
+            getWhatsAppState(
+                getUserId(req)
+            );
 
         res.json({
 
@@ -1596,7 +1868,7 @@ async function bootstrap() {
             "✅ Database Ready"
         );
 
-        await startWhatsApp();
+        await bootstrapWhatsAppSessions();
 
         console.log(
             "✅ WhatsApp Ready"

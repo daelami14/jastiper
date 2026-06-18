@@ -1,18 +1,32 @@
-let sock = null;
+const sockets =
+    new Map();
 
-function setSocket(socket) {
+function setSocket(
+    userId,
+    socket
+) {
 
-    sock = socket;
+    sockets.set(
+        userId,
+        socket
+    );
 
 }
 
-function getSocket() {
+function getSocket(userId) {
 
-    return sock;
+    return sockets.get(userId) || null;
+
+}
+
+function removeSocket(userId) {
+
+    sockets.delete(userId);
 
 }
 
 module.exports = {
     setSocket,
-    getSocket
+    getSocket,
+    removeSocket
 };
