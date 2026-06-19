@@ -1409,7 +1409,8 @@ const whatsappState =
 app.get(
     "/whatsapp",
     async (req, res) => {
-
+        const pool =
+            require("./database/db");
         try {
             const [[orderToday]] =
             await pool.query(`
@@ -1423,7 +1424,7 @@ app.get(
             await pool.query(`
                 SELECT
                     COUNT(*) total
-                FROM interest_orders
+                FROM orders
                 WHERE DATE(created_at)=CURDATE()
             `);
 
